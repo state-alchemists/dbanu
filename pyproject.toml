@@ -1,0 +1,20 @@
+[project]
+name = "dbanu"
+version = "0.0.1"
+description = "FastAPI SQL Query Engine"
+authors = [
+    {name = "gofrendi",email = "gofrendiasgard@gmail.com"}
+]
+license = {text = "MIT"}
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi (>=0.118.3,<0.119.0)",
+    "psycopg2-binary (>=2.9.11,<3.0.0)",
+    "mysql-connector-python (>=9.4.0,<10.0.0)"
+]
+
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
