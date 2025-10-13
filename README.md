@@ -99,119 +99,7 @@ serve_select(
 
 ### Full Example with Dependencies and Middleware
 
-```python
-import sqlite3
-from typing import Any
-from pydantic import BaseModel
-from fastapi import FastAPI, Depends
-from dbanu import serve_select, SQLiteQueryEngine
-
-app = FastAPI()
-
-# Custom query engine with setup
-class MyQueryEngine(SQLiteQueryEngine):
-    def _setup_database(self, conn: sqlite3.Connection):
-        cursor = conn.cursor()
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS books (
-                id INTEGER PRIMARY KEY,
-                title TEXT NOT NULL,
-                author TEXT NOT NULL,
-                year INTEGER NOT NULL
-            )
-        """)
-        books = [
-            (1, "The Great Gatsby", "F. Scott Fitzgerald", 1925),
-            (2, "To Kill a Mockingbird", "Harper Lee", 1960),
-        ]
-        cursor.executemany("INSERT OR REPLACE INTO books VALUES (?, ?, ?, ?)", books)
-        conn.commit()
-
-# FastAPI dependencies
-async def get_current_user():
-    return {"user_id": 1, "username": "demo_user"}
-
-async def rate_limit_check():
-    return True
-
-# Middleware functions
-def logging_middleware(filters: BaseModel, limit: int, offset: int, dependency_results: dict[str, Any], next_handler):
-    user_info = dependency_results.get('get_current_user', {})
-    username = user_info.get('username', 'anonymous')
-    print(f"[LOG] Request from {username}: filters={filters.model_dump()}")
-    result = next_handler()
-    print(f"[LOG] Response: {len(result.data)} items")
-    return result
-
-def authorization_middleware(filters: BaseModel, limit: int, offset: int, dependency_results: dict[str, Any], next_handler):
-    from fastapi import HTTPException
-    
-    current_user = dependency_results.get('get_current_user')
-    if not current_user:
-        raise HTTPException(status_code=401, detail="Authentication required")
-    
-    if current_user.get('user_id') != 1:
-        raise HTTPException(status_code=403, detail="Access forbidden")
-    
-    return next_handler()
-
-# Pydantic models
-class BookFilter(BaseModel):
-    author: str | None = None
-    min_year: int | None = None
-
-class BookData(BaseModel):
-    id: int
-    title: str
-    author: str
-    year: int
-
-# Create query engine
-query_engine = MyQueryEngine()
-
-# Register endpoint with all features
-serve_select(
-    app=app,
-    query_engine=query_engine,
-    path="/api/v1/books",
-    filter_model=BookFilter,
-    data_model=BookData,
-    select_query=(
-        "SELECT id, title, author, year FROM books "
-        "WHERE (author = ? OR ? IS NULL) "
-        "AND (year >= ? OR ? IS NULL) "
-        "LIMIT ? OFFSET ?"
-    ),
-    select_param=lambda filters, limit, offset: [
-        filters.author, filters.author,
-        filters.min_year, filters.min_year,
-        limit, offset
-    ],
-    count_query=(
-        "SELECT COUNT(*) FROM books "
-        "WHERE (author = ? OR ? IS NULL) "
-        "AND (year >= ? OR ? IS NULL)"
-    ),
-    count_param=lambda filters: [
-        filters.author, filters.author,
-        filters.min_year, filters.min_year
-    ],
-    dependencies=[Depends(get_current_user), Depends(rate_limit_check)],
-    middlewares=[logging_middleware, authorization_middleware]
-)
-
-@app.get("/")
-def read_root():
-    return {"message": "DBAnu Books API is running!"}
-
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
-```
-
-### Even More Complex Example
-
-No, no such thing. If you really need something more complex, you probably need to actually code your own router.
+For a complete example demonstrating database setup, dependencies, and middleware, please see `example/server.py`.
 
 ## Database Engines
 
@@ -289,7 +177,7 @@ def middleware_name(
 python -m example.server
 ```
 
-Visit http://localhost:8000/api/v1/books to test the API.
+Visit http://localhost:8000/docs to test the API.
 
 ## License
 

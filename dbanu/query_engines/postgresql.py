@@ -1,5 +1,7 @@
-import psycopg2
 from typing import Any
+
+import psycopg2
+
 from dbanu.select_route import SelectEngine
 
 
@@ -7,14 +9,14 @@ class PostgreSQLQueryEngine(SelectEngine):
     """
     A PostgreSQL query engine that connects to a PostgreSQL database.
     """
-    
+
     def __init__(
-        self, 
+        self,
         host: str = "localhost",
         port: int = 5432,
         database: str = "postgres",
         user: str = "postgres",
-        password: str = ""
+        password: str = "",
     ):
         self._host = host
         self._port = port
@@ -26,9 +28,9 @@ class PostgreSQLQueryEngine(SelectEngine):
             "port": port,
             "database": database,
             "user": user,
-            "password": password
+            "password": password,
         }
-    
+
     def _get_connection(self):
         """Get a connection to the PostgreSQL database."""
         return psycopg2.connect(**self._connection_params)
@@ -39,17 +41,17 @@ class PostgreSQLQueryEngine(SelectEngine):
         """
         conn = self._get_connection()
         cursor = conn.cursor()
-        
+
         try:
             # Execute the query with parameters
             if params:
                 cursor.execute(query, params)
             else:
                 cursor.execute(query)
-            
+
             # Fetch results
             results = cursor.fetchall()
-            
+
             # Convert to list of dictionaries for Pydantic compatibility
             if results and len(results) > 0:
                 # Get column names
@@ -61,7 +63,7 @@ class PostgreSQLQueryEngine(SelectEngine):
                 return dict_results
             else:
                 return []
-                
+
         except Exception as e:
             print(f"Query execution error: {e}")
             return []
@@ -75,18 +77,18 @@ class PostgreSQLQueryEngine(SelectEngine):
         """
         conn = self._get_connection()
         cursor = conn.cursor()
-        
+
         try:
             # Execute the query with parameters
             if params:
                 cursor.execute(query, params)
             else:
                 cursor.execute(query)
-            
+
             # Fetch the count result
             result = cursor.fetchone()
             return result[0] if result else 0
-                
+
         except Exception as e:
             print(f"Count query execution error: {e}")
             return 0
