@@ -59,7 +59,7 @@ def serve_select(
         
         def final_handler(filters: BaseModel, limit: int, offset: int, dependency_results: dict[str, Any]) -> ResponseModel:
             """The final handler that executes the queries."""
-            select_args = select_param(filters, limit, offset) if select_param is not None else []
+            select_args = select_param(filters, limit, offset) if select_param is not None else [limit, offset]
             data = query_engine.select(select_query, *select_args)
             total = -1
             if count_query:
