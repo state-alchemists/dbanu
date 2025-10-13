@@ -112,6 +112,14 @@ class BookData(BaseModel):
 # Create SQLite query engine instance
 query_engine = MyQueryEngine()
 
+# Simplest implementation
+serve_select(
+    app=app,
+    query_engine=query_engine,
+    path="/api/v0/books",
+    select_query="SELECT * FROM books"
+)
+
 # Register the books endpoint using serve_select with dependencies and middlewares
 serve_select(
     app=app,

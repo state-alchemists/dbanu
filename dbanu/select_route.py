@@ -51,8 +51,8 @@ def serve_select(
         middlewares = []
 
     class ResponseModel(BaseModel):
-        data: list[data_model]
-        count: int | None
+        data: list[data_model] | list[Any]
+        count: int | None = None
 
     def create_middleware_chain():
         """Create the middleware chain with the final handler at the end."""
