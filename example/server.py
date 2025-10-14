@@ -6,7 +6,7 @@ from typing import Any
 from fastapi import Depends, FastAPI, HTTPException
 from pydantic import BaseModel
 
-from dbanu import SQLiteQueryEngine, serve_select
+from dbanu import SQLiteQueryEngine, QueryContext, serve_select
 
 CURRENT_DIR = os.path.dirname(__file__)
 DB_PATH = os.path.join(CURRENT_DIR, "sample.db")
@@ -116,50 +116,44 @@ serve_select(
 
 # 3. Custom Table and Filter
 
-
-class FreeSQLiteQueryEngine(SQLiteQueryEngine):
-    def _mutate_query(self, query: str, params: Any) -> tuple[str, list[Any]]:
-        new_params = list(params)
-        table_name = new_params.pop(0).strip()
-        if table_name == "":
-            raise ValueError("Table name cannot be empty")
-        filters = new_params.pop(0).strip()
-        if filters == "":
-            filters = "1=1"
-        new_query = query.replace("__table__", table_name).replace(
-            "__filters__", filters
-        )
-        print(new_query, new_params)
-        return new_query, new_params
-
-    def select(self, query: str, *params: Any) -> list[Any]:
-        new_query, new_params = self._mutate_query(query, params)
-        return super().select(new_query, *new_params)
-
-    def select_count(self, query: str, *params: Any) -> int:
-        new_query, new_params = self._mutate_query(query, params)
-        return super().select_count(new_query, *new_params)
-
-
 class FreeQueryFilter(BaseModel):
     table: str
     condition: str
 
 
+def modify_query(context: QueryContext, next_handler):
+    context.count_params = []
+    context.select_params = []
+    table_name = context.filters.table.strip()
+    if table_name == "":
+        raise ValueError("Table name cannot be empty")
+    condition = context.filters.condition.strip()
+    if condition == "":
+        condition = "1=1"
+    context.select_query = _construct_query(
+        context.select_query, table_name, condition
+    )
+    context.select_params = [context.limit, context.offset]
+    if context.count_query is not None:
+        context.count_query = _construct_query(
+            context.count_query, table_name, condition
+        )
+    print(context)
+    return next_handler()
+
+
+def _construct_query(query: str, table_name: str, condition: str) -> str:
+    return query.replace("__table__", table_name).replace("__filters__", condition)
+
+
 serve_select(
     app=app,
-    query_engine=FreeSQLiteQueryEngine(),
+    query_engine=query_engine,
     path="/api/v1/query",
     filter_model=FreeQueryFilter,
     select_query="SELECT * FROM __table__ WHERE __filters__ LIMIT ? OFFSET ?",
-    select_param=lambda filters, limit, offset: [
-        filters.table,
-        filters.condition,
-        limit,
-        offset,
-    ],
     count_query="SELECT count(1) FROM __table__ WHERE __filters__",
-    count_param=lambda filters: [filters.table, filters.condition],
+    middlewares=[modify_query]
 )
 
 
@@ -177,32 +171,22 @@ async def rate_limit_check():
     return True
 
 
-## Example middlewares
-def logging_middleware(
-    filters: BaseModel,
-    limit: int,
-    offset: int,
-    dependency_results: dict[str, Any],
-    next_handler,
-):
+## Example middlewares with new Context-based signature
+def logging_middleware(context, next_handler):
     """Middleware for logging requests"""
-    user_info = dependency_results.get("get_current_user", {})
+    user_info = context.dependency_results.get("get_current_user", {})
     username = user_info.get("username", "anonymous")
     print(
-        f"[LOG] Request from {username}: filters={filters.model_dump()}, limit={limit}, offset={offset}"
+        f"[LOG] Request from {username}: filters={context.filters.model_dump()}, limit={context.limit}, offset={context.offset}"
     )
+    print(f"[LOG] Select query: {context.select_query}")
+    print(f"[LOG] Select params: {context.select_params}")
     result = next_handler()
     print(f"[LOG] Response: {len(result.data)} items")
     return result
 
 
-def timing_middleware(
-    filters: BaseModel,
-    limit: int,
-    offset: int,
-    dependency_results: dict[str, Any],
-    next_handler,
-):
+def timing_middleware(context, next_handler):
     """Middleware for timing requests"""
     start_time = time.time()
     result = next_handler()
@@ -211,16 +195,10 @@ def timing_middleware(
     return result
 
 
-def authorization_middleware(
-    filters: BaseModel,
-    limit: int,
-    offset: int,
-    dependency_results: dict[str, Any],
-    next_handler,
-):
+def authorization_middleware(context, next_handler):
     """Middleware for authorization checks"""
     # Access the current user from dependency results
-    current_user = dependency_results.get("get_current_user")
+    current_user = context.dependency_results.get("get_current_user")
     print(f"[CURRENT_USER] {current_user}")
     if not current_user:
         raise HTTPException(status_code=401, detail="Authentication required")
@@ -228,7 +206,7 @@ def authorization_middleware(
     if current_user.get("user_id") != 1:
         raise HTTPException(status_code=403, detail="Access forbidden")
     # Check rate limiting
-    rate_limit_passed = dependency_results.get("rate_limit_check", False)
+    rate_limit_passed = context.dependency_results.get("rate_limit_check", False)
     if not rate_limit_passed:
         raise HTTPException(status_code=429, detail="Rate limit exceeded")
     # If all checks pass, proceed with the request
@@ -273,7 +251,11 @@ serve_select(
         filters.max_year,
     ],
     dependencies=[Depends(get_current_user), Depends(rate_limit_check)],
-    middlewares=[logging_middleware, timing_middleware, authorization_middleware],
+    middlewares=[
+        logging_middleware, 
+        authorization_middleware, 
+        timing_middleware
+    ],
 )
 
 

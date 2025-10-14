@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Any, Callable, Type
+from typing import Any, Callable, Type, Optional
 
 from fastapi import Depends, FastAPI, Request
 from pydantic import BaseModel, create_model
@@ -16,8 +16,24 @@ class SelectEngine(ABC):
         pass
 
 
-# Middleware type definition
-Middleware = Callable[[BaseModel, int, int, dict[str, Any], Callable], Any]
+class QueryContext(BaseModel):
+    """
+    Context object passed to middlewares, containing all query-related data
+    that can be modified by middleware.
+    """
+    select_query: str
+    select_params: list[Any]
+    count_query: Optional[str] = None
+    count_params: list[Any]
+    filters: BaseModel
+    limit: int
+    offset: int
+    dependency_results: dict[str, Any]
+
+
+# Middleware type that receives QueryContext and next middleware callable
+# and returns the ResponseModel (data_model)
+Middleware = Callable[[QueryContext, Callable[[QueryContext], Any]], Any]
 
 
 def serve_select(
@@ -56,49 +72,24 @@ def serve_select(
         count: int | None = None
 
     def create_middleware_chain():
-        """Create the middleware chain with the final handler at the end."""
+        """Create the middleware chain with FastAPI-style middleware pattern."""
 
-        def final_handler(
-            filters: BaseModel,
-            limit: int,
-            offset: int,
-            dependency_results: dict[str, Any],
-        ) -> ResponseModel:
-            """The final handler that executes the queries."""
-            select_args = (
-                select_param(filters, limit, offset)
-                if select_param is not None
-                else [limit, offset]
-            )
-            data = query_engine.select(select_query, *select_args)
-            total = -1
-            if count_query:
-                count_args = count_param(filters) if count_param is not None else []
-                total = query_engine.select_count(count_query, *count_args)
+        def final_handler(context: QueryContext) -> ResponseModel:
+            """The final handler that executes the queries using the processed context."""
+            data = query_engine.select(context.select_query, *context.select_params)
+            
+            if context.count_query:
+                total = query_engine.select_count(context.count_query, *context.count_params)
                 return ResponseModel(data=data, count=total)
             return ResponseModel(data=data)
 
-        # Build the middleware chain from right to left
+        # Build the middleware chain from right to left (like FastAPI)
         handler = final_handler
         for middleware in reversed(middlewares):
             # Create a closure-safe wrapper
             def make_wrapper(current_middleware, next_handler):
-                def wrapper(
-                    filters: BaseModel,
-                    limit: int,
-                    offset: int,
-                    dependency_results: dict[str, Any],
-                ):
-                    return current_middleware(
-                        filters,
-                        limit,
-                        offset,
-                        dependency_results,
-                        lambda: next_handler(
-                            filters, limit, offset, dependency_results
-                        ),
-                    )
-
+                def wrapper(context: QueryContext):
+                    return current_middleware(context, lambda: next_handler(context))
                 return wrapper
 
             handler = make_wrapper(middleware, handler)
@@ -143,5 +134,27 @@ def serve_select(
         if request and hasattr(request.state, "dependency_results"):
             dependency_results = request.state.dependency_results
 
+        # Build initial select parameters
+        select_args = (
+            select_param(filters, limit, offset)
+            if select_param is not None
+            else [limit, offset]
+        )
+        
+        # Build initial count parameters
+        count_args = count_param(filters) if count_param is not None else []
+
+        # Create initial QueryContext
+        initial_context = QueryContext(
+            select_query=select_query,
+            select_params=select_args,
+            count_query=count_query,
+            count_params=count_args,
+            filters=filters,
+            limit=limit,
+            offset=offset,
+            dependency_results=dependency_results,
+        )
+
         handler = create_middleware_chain()
-        return handler(filters, limit, offset, dependency_results)
+        return handler(initial_context)
