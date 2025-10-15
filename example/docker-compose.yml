@@ -1,0 +1,61 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15
+    container_name: dbanu_postgres
+    environment:
+      POSTGRES_DB: dbanu_db
+      POSTGRES_USER: dbanu_user
+      POSTGRES_PASSWORD: dbanu_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init/postgres:/docker-entrypoint-initdb.d
+    networks:
+      - dbanu_network
+
+  mysql:
+    image: mysql:8.0
+    container_name: dbanu_mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: root_password
+      MYSQL_DATABASE: dbanu_db
+      MYSQL_USER: dbanu_user
+      MYSQL_PASSWORD: dbanu_password
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./init/mysql:/docker-entrypoint-initdb.d
+    networks:
+      - dbanu_network
+
+  impala:
+    image: apache/impala:latest
+    container_name: dbanu_impala
+    environment:
+      - IMPALA_CATALOG_SERVICE_HOST=impala
+      - IMPALA_STATESTORE_HOST=impala
+    ports:
+      - "21000:21000"
+      - "21050:21050"
+      - "25000:25000"
+      - "25010:25010"
+      - "25020:25020"
+    volumes:
+      - ./init/impala:/opt/impala/init
+    networks:
+      - dbanu_network
+    depends_on:
+      - postgres
+      - mysql
+
+volumes:
+  postgres_data:
+  mysql_data:
+
+networks:
+  dbanu_network:
+    driver: bridge
