@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Any, Callable, Type, Optional
+from typing import Any, Callable, Optional, Type
 
 from fastapi import Depends, FastAPI, Request
 from pydantic import BaseModel, create_model
@@ -21,6 +21,7 @@ class QueryContext(BaseModel):
     Context object passed to middlewares, containing all query-related data
     that can be modified by middleware.
     """
+
     select_query: str
     select_params: list[Any]
     count_query: Optional[str] = None
@@ -77,9 +78,11 @@ def serve_select(
         def final_handler(context: QueryContext) -> ResponseModel:
             """The final handler that executes the queries using the processed context."""
             data = query_engine.select(context.select_query, *context.select_params)
-            
+
             if context.count_query:
-                total = query_engine.select_count(context.count_query, *context.count_params)
+                total = query_engine.select_count(
+                    context.count_query, *context.count_params
+                )
                 return ResponseModel(data=data, count=total)
             return ResponseModel(data=data)
 
@@ -90,6 +93,7 @@ def serve_select(
             def make_wrapper(current_middleware, next_handler):
                 def wrapper(context: QueryContext):
                     return current_middleware(context, lambda: next_handler(context))
+
                 return wrapper
 
             handler = make_wrapper(middleware, handler)
@@ -140,7 +144,7 @@ def serve_select(
             if select_param is not None
             else [limit, offset]
         )
-        
+
         # Build initial count parameters
         count_args = count_param(filters) if count_param is not None else []
 

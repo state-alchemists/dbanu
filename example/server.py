@@ -1,55 +1,70 @@
-import os
-import sqlite3
 import time
-from typing import Any
 
 from fastapi import Depends, FastAPI, HTTPException
 from pydantic import BaseModel
 
-from dbanu import SQLiteQueryEngine, QueryContext, serve_select
-
-CURRENT_DIR = os.path.dirname(__file__)
-DB_PATH = os.path.join(CURRENT_DIR, "sample.db")
-conn = sqlite3.connect(DB_PATH)
-cursor = conn.cursor()
-# Create books table
-cursor.execute(
-    """
-    CREATE TABLE IF NOT EXISTS books (
-        id INTEGER PRIMARY KEY,
-        title TEXT NOT NULL,
-        author TEXT NOT NULL,
-        year INTEGER NOT NULL
-    )
-    """
+from dbanu import (
+    MySQLQueryEngine,
+    PostgreSQLQueryEngine,
+    QueryContext,
+    SQLiteQueryEngine,
+    serve_select,
 )
-# Insert sample data
-books = [
-    (1, "The Great Gatsby", "F. Scott Fitzgerald", 1925),
-    (2, "To Kill a Mockingbird", "Harper Lee", 1960),
-    (3, "1984", "George Orwell", 1949),
-    (4, "Pride and Prejudice", "Jane Austen", 1813),
-    (5, "The Catcher in the Rye", "J.D. Salinger", 1951),
-]
-cursor.executemany(
-    """
-    INSERT OR REPLACE INTO books (id, title, author, year)
-    VALUES (?, ?, ?, ?)
-    """,
-    books,
+from example.config import (
+    MYSQL_DATABASE,
+    MYSQL_HOST,
+    MYSQL_PASSWORD,
+    MYSQL_PORT,
+    MYSQL_USER,
+    PG_SQL_DATABASE,
+    PG_SQL_HOST,
+    PG_SQL_PASSWORD,
+    PG_SQL_PORT,
+    PG_SQL_USER,
+    SQLITE_DB_PATH,
 )
-conn.commit()
+from example.setup import setup_sqlite
 
+setup_sqlite()
 
 # 1. Simplest implementation
 app = FastAPI()
-query_engine = SQLiteQueryEngine(db_path=DB_PATH)
-
+sqlite_query_engine = SQLiteQueryEngine(db_path=SQLITE_DB_PATH)
 serve_select(
     app=app,
-    query_engine=query_engine,
-    path="/api/v1/books",
+    query_engine=sqlite_query_engine,
+    path="/api/v1/sqlite/books",
     select_query="SELECT * FROM books LIMIT ? OFFSET ?",
+    count_query="SELECT count(1) FROM books",
+)
+
+pgsql_query_engine = PostgreSQLQueryEngine(
+    host=PG_SQL_HOST,
+    port=PG_SQL_PORT,
+    database=PG_SQL_DATABASE,
+    user=PG_SQL_USER,
+    password=PG_SQL_PASSWORD,
+)
+serve_select(
+    app=app,
+    query_engine=pgsql_query_engine,
+    path="/api/v1/pgsql/books",
+    select_query="SELECT * FROM books LIMIT %s OFFSET %s",
+    count_query="SELECT count(1) FROM books",
+)
+
+mysql_query_engine = MySQLQueryEngine(
+    host=MYSQL_HOST,
+    port=MYSQL_PORT,
+    database=MYSQL_DATABASE,
+    user=MYSQL_USER,
+    password=MYSQL_PASSWORD,
+)
+serve_select(
+    app=app,
+    query_engine=mysql_query_engine,
+    path="/api/v1/mysql/books",
+    select_query="SELECT * FROM books LIMIT %s OFFSET %s",
     count_query="SELECT count(1) FROM books",
 )
 
@@ -77,7 +92,7 @@ class BookData(BaseModel):
 
 serve_select(
     app=app,
-    query_engine=query_engine,
+    query_engine=sqlite_query_engine,
     path="/api/v2/books",
     filter_model=BookFilter,
     data_model=BookData,
@@ -116,6 +131,7 @@ serve_select(
 
 # 3. Custom Table and Filter
 
+
 class FreeQueryFilter(BaseModel):
     table: str
     condition: str
@@ -130,9 +146,7 @@ def modify_query(context: QueryContext, next_handler):
     condition = context.filters.condition.strip()
     if condition == "":
         condition = "1=1"
-    context.select_query = _construct_query(
-        context.select_query, table_name, condition
-    )
+    context.select_query = _construct_query(context.select_query, table_name, condition)
     context.select_params = [context.limit, context.offset]
     if context.count_query is not None:
         context.count_query = _construct_query(
@@ -148,12 +162,12 @@ def _construct_query(query: str, table_name: str, condition: str) -> str:
 
 serve_select(
     app=app,
-    query_engine=query_engine,
+    query_engine=sqlite_query_engine,
     path="/api/v1/query",
     filter_model=FreeQueryFilter,
     select_query="SELECT * FROM __table__ WHERE __filters__ LIMIT ? OFFSET ?",
     count_query="SELECT count(1) FROM __table__ WHERE __filters__",
-    middlewares=[modify_query]
+    middlewares=[modify_query],
 )
 
 
@@ -215,7 +229,7 @@ def authorization_middleware(context, next_handler):
 
 serve_select(
     app=app,
-    query_engine=query_engine,
+    query_engine=sqlite_query_engine,
     path="/api/v3/books",
     filter_model=BookFilter,
     data_model=BookData,
@@ -251,11 +265,7 @@ serve_select(
         filters.max_year,
     ],
     dependencies=[Depends(get_current_user), Depends(rate_limit_check)],
-    middlewares=[
-        logging_middleware, 
-        authorization_middleware, 
-        timing_middleware
-    ],
+    middlewares=[logging_middleware, authorization_middleware, timing_middleware],
 )
 
 
