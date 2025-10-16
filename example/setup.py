@@ -17,13 +17,15 @@ def setup_sqlite():
         )
         """
     )
-    # Insert sample data
+    # Insert sample data - Classic Literature theme
     books = [
         (1, "The Great Gatsby", "F. Scott Fitzgerald", 1925),
         (2, "To Kill a Mockingbird", "Harper Lee", 1960),
         (3, "1984", "George Orwell", 1949),
         (4, "Pride and Prejudice", "Jane Austen", 1813),
         (5, "The Catcher in the Rye", "J.D. Salinger", 1951),
+        (6, "Brave New World", "Aldous Huxley", 1932),
+        (7, "Wuthering Heights", "Emily Brontë", 1847),
     ]
     cursor.executemany(
         """

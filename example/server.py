@@ -8,7 +8,9 @@ from dbanu import (
     PostgreSQLQueryEngine,
     QueryContext,
     SQLiteQueryEngine,
+    SelectSource,
     serve_select,
+    serve_union,
 )
 from example.config import (
     MYSQL_DATABASE,
@@ -68,6 +70,25 @@ serve_select(
     count_query="SELECT count(1) FROM books",
 )
 
+serve_union(
+    app=app,
+    sources=[
+        SelectSource(
+            query_engine=sqlite_query_engine,
+            select_query="SELECT * FROM books LIMIT ? OFFSET ?",
+        ),
+        SelectSource(
+            query_engine=pgsql_query_engine,
+            select_query="SELECT * FROM books LIMIT %s OFFSET %s",
+        ),
+        SelectSource(
+            query_engine=mysql_query_engine,
+            select_query="SELECT * FROM books LIMIT %s OFFSET %s",
+        ),
+    ],
+    path="/api/v1/all/books",
+    description="Get all books from sqlite, postgre, and mysql"
+)
 
 # 2. Register the books endpoint with filters
 
