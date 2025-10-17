@@ -5,6 +5,7 @@ DBAnu is a lightweight Python library that simplifies creating FastAPI endpoints
 ## Features
 
 - **Type-Safe Query Generation**: Automatically generate FastAPI routes from SQL queries
+- **Multi-Database Union Queries**: Combine results from multiple databases with `serve_union`
 - **Flexible Filtering**: Support for complex filtering with Pydantic models
 - **Built-in Pagination**: Automatic limit/offset pagination support
 - **FastAPI Integration**: Seamless integration with FastAPI dependencies and middleware
@@ -169,6 +170,56 @@ serve_select(
 )
 ```
 
+### Using Union Queries - Combining Multiple Databases
+
+The `serve_union` function allows you to query multiple databases simultaneously and combine their results. This is useful when you have data distributed across different database systems.
+
+```python
+from fastapi import FastAPI
+from dbanu import serve_union, SelectSource, SQLiteQueryEngine, PostgreSQLQueryEngine, MySQLQueryEngine
+
+app = FastAPI()
+
+# Create query engines for different databases
+sqlite_engine = SQLiteQueryEngine()
+pgsql_engine = PostgreSQLQueryEngine(
+    host="localhost", port=5432, database="books_db", 
+    user="user", password="password"
+)
+mysql_engine = MySQLQueryEngine(
+    host="localhost", port=3306, database="books_db",
+    user="user", password="password"
+)
+
+# Define sources with different databases
+serve_union(
+    app=app,
+    sources=[
+        SelectSource(
+            query_engine=sqlite_engine,
+            select_query="SELECT * FROM books LIMIT ? OFFSET ?",
+        ),
+        SelectSource(
+            query_engine=pgsql_engine,
+            select_query="SELECT * FROM books LIMIT %s OFFSET %s",
+        ),
+        SelectSource(
+            query_engine=mysql_engine,
+            select_query="SELECT * FROM books LIMIT %s OFFSET %s",
+        ),
+    ],
+    path="/api/all-books",
+    description="Get books from all databases (SQLite, PostgreSQL, MySQL)"
+)
+```
+
+This will create an endpoint that queries all three databases and returns a combined result set. Each database can contain different data - for example:
+- **SQLite**: Classic Literature books
+- **PostgreSQL**: Fantasy books  
+- **MySQL**: Science Fiction books
+
+The response will include all books from all three databases in a single unified response.
+
 For a complete example with more advanced middleware usage, please see `example/server.py`.
 
 ## Database Engines
@@ -178,7 +229,7 @@ For a complete example with more advanced middleware usage, please see `example/
 ```python
 from dbanu import SQLiteQueryEngine
 
-query_engine = SQLiteQueryEngine()
+query_engine = SQLiteQueryEngine(db_path="./database.db")
 ```
 
 ### PostgreSQL
@@ -224,6 +275,25 @@ query_engine = MySQLQueryEngine(
 - `data_model`: Pydantic model for response data
 - `dependencies`: List of FastAPI dependencies
 - `middlewares`: List of middleware functions that receive `QueryContext`
+- `summary`: Optional API endpoint summary
+- `description`: Optional API endpoint description
+
+### `serve_union` Parameters
+
+- `app`: FastAPI application instance
+- `sources`: List of `SelectSource` objects, each containing:
+  - `query_engine`: Database query engine for this source
+  - `select_query`: SQL SELECT query string
+  - `select_param`: Optional function to generate query parameters
+  - `count_query`: Optional SQL COUNT query
+  - `count_param`: Optional function for COUNT parameters
+- `path`: API endpoint path (default: "/get")
+- `filter_model`: Pydantic model for filtering (applies to all sources)
+- `data_model`: Pydantic model for response data
+- `dependencies`: List of FastAPI dependencies
+- `middlewares`: List of middleware functions
+- `summary`: Optional API endpoint summary
+- `description`: Optional API endpoint description
 
 ### Middleware System
 
@@ -291,11 +361,42 @@ def query_modification_middleware(context: QueryContext, next_handler):
 
 ## Running the Example
 
+The example demonstrates DBAnu with three different databases, each containing different book collections:
+
+### Sample Data Distribution
+
+- **SQLite Database** (`example/sample.db`):
+  - Classic Literature: The Great Gatsby, To Kill a Mockingbird, 1984, Pride and Prejudice, etc.
+
+- **PostgreSQL Database**:
+  - Fantasy Books: The Hobbit, Harry Potter series, Game of Thrones, The Name of the Wind, etc.
+
+- **MySQL Database**:
+  - Science Fiction: Dune, Foundation, Neuromancer, The Martian, Ready Player One, etc.
+
+### Running with Docker Compose
+
+1. Start the databases:
+```bash
+cd example
+docker-compose up -d
+```
+
+2. Initialize SQLite and run the server:
 ```bash
 python -m example.server
 ```
 
-Visit http://localhost:8000/docs to test the API.
+3. Visit http://localhost:8000/docs to test the API
+
+### Available Endpoints
+
+- `/api/v1/books` - Get books from SQLite (Classic Literature)
+- `/api/v1/all/books` - Get books from ALL databases combined (Union query)
+- `/api/v2/books` - Books with filtering support
+- `/api/v3/books` - Books with authentication and logging middleware
+
+The union endpoint (`/api/v1/all/books`) demonstrates how DBAnu can seamlessly combine results from multiple databases, returning books from SQLite, PostgreSQL, and MySQL in a single response.
 
 ## License
 
