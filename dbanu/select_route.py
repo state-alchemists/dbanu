@@ -111,7 +111,6 @@ def serve_select(
         return handler(initial_context)
 
 
-
 class SelectSource(BaseModel):
     model_config = {"arbitrary_types_allowed": True}
     query_engine: SelectEngine
@@ -194,7 +193,7 @@ def _create_select_response_model(data_model: Type[BaseModel] | None = None):
     class SelectResponseModel(BaseModel):
         data: list[actual_data_model] | list[Any]  # type: ignore
         count: int
-    
+
     return SelectResponseModel
 
 
@@ -210,7 +209,7 @@ def _create_query_processor(query_engine: SelectEngine, response_model: type[Bas
             )
             return response_model(data=data, count=total)
         return response_model(data=data, count=len(data))
-    
+
     return process_query
 
 def _create_middleware_chain(
