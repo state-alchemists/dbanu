@@ -75,17 +75,17 @@ serve_union(
     sources={
         "sqlite": SelectSource(
             query_engine=sqlite_query_engine,
-            select_query="SELECT * FROM books LIMIT ? OFFSET ?",
+            select_query="SELECT *, 'sqlite' as source FROM books LIMIT ? OFFSET ?",
             count_query="SELECT COUNT(1) FROM books",
         ),
         "psql": SelectSource(
             query_engine=pgsql_query_engine,
-            select_query="SELECT * FROM books LIMIT %s OFFSET %s",
+            select_query="SELECT *, 'psql' as source FROM books LIMIT %s OFFSET %s",
             count_query="SELECT COUNT(1) FROM books",
         ),
         "mysql": SelectSource(
             query_engine=mysql_query_engine,
-            select_query="SELECT * FROM books LIMIT %s OFFSET %s",
+            select_query="SELECT *, 'mysql' as source FROM books LIMIT %s OFFSET %s",
             count_query="SELECT COUNT(1) FROM books",
         ),
     },

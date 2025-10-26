@@ -119,6 +119,7 @@ class SelectSource(BaseModel):
     select_param: Callable[[BaseModel, int, int], list[Any]] | None = None
     count_query: str
     count_param: Callable[[BaseModel], list[Any]] | None = None
+    middlewares: list[Middleware] | None = None
 
 
 def serve_union(
@@ -160,36 +161,77 @@ def serve_union(
         dependency_results = {}
         if request and hasattr(request.state, "dependency_results"):
             dependency_results = request.state.dependency_results
-        final_result = SelectResponseModel(data=[], count=0)
+        
         if priority is None:
             priority = list(sources.keys())
+        
+        # Step 1: Get total count from each source
+        source_counts = {}
+        total_count = 0
         for source_name in priority:
             source = sources[source_name]
-            # Build initial select parameters
-            select_args = (
-                source.select_param(filters, limit, offset)
-                if source.select_param is not None
-                else [limit, offset]
-            )
-            # Build initial count parameters
-            count_args = source.count_param(filters) if source.count_param is not None else []
-            # Create initial QueryContext
-            initial_context = QueryContext(
-                select_query=source.select_query,
-                select_params=select_args,
+            count_context = QueryContext(
+                select_query="",
+                select_params=[],
                 count_query=source.count_query,
-                count_params=count_args,
+                count_params=source.count_param,
                 filters=filters,
-                limit=limit,
-                offset=offset,
+                limit=0,
+                offset=0,
                 dependency_results=dependency_results,
             )
-            query_processor = _create_query_processor(source.query_engine, SelectResponseModel)
-            handler = _create_middleware_chain(middlewares, query_processor)
-            result = await handler(initial_context)
-            final_result.data = final_result.data + result.data
-            final_result.count = final_result.count + result.count
-        return final_result
+            count_processor = _create_count_processor(source.query_engine)
+            handler = _create_middleware_chain(source.middlewares, count_processor)
+            source_count = await handler(count_context)
+            source_counts[source_name] = source_count
+            total_count += source_count
+        
+        # Step 2: Calculate which records to fetch from each source
+        final_data = []
+        remaining_limit = limit
+        current_offset = offset
+        for source_name in priority:
+            source = sources[source_name]
+            source_count = source_counts[source_name]
+            # Skip this source if offset is beyond its records
+            if current_offset >= source_count:
+                current_offset -= source_count
+                continue
+            # Calculate how many records to fetch from this source
+            source_limit = min(remaining_limit, source_count - current_offset)
+            if source_limit > 0:
+                # Build select parameters for this specific source
+                select_args = (
+                    source.select_param(filters, source_limit, current_offset)
+                    if source.select_param is not None
+                    else [source_limit, current_offset]
+                )
+                # Create QueryContext for this source
+                select_context = QueryContext(
+                    select_query=source.select_query,
+                    select_params=select_args,
+                    count_query="",
+                    count_params=[],
+                    filters=filters,
+                    limit=source_limit,
+                    offset=current_offset,
+                    dependency_results=dependency_results,
+                )
+                select_processor = _create_select_processor(source.query_engine)
+                handler = _create_middleware_chain(
+                    _get_combined_middlewares(middlewares, source.middlewares),
+                    select_processor
+                )
+                source_data = await handler(select_context)
+                # Add the data to final result
+                final_data.extend(source_data)
+                remaining_limit -= len(source_data)
+                # Reset offset for next source
+                current_offset = 0
+            # Stop if we've reached the limit
+            if remaining_limit <= 0:
+                break
+        return SelectResponseModel(data=final_data, count=total_count)
 
 
 def _create_select_response_model(data_model: Type[BaseModel] | None = None):
@@ -202,19 +244,43 @@ def _create_select_response_model(data_model: Type[BaseModel] | None = None):
     return SelectResponseModel
 
 
+def _create_select_processor(query_engine: SelectEngine):
+
+    async def process_select(context: QueryContext) -> list[Any]:
+        select_params = context.select_params or []
+        # Check if select method is a coroutine
+        select_method = query_engine.select
+        if inspect.iscoroutinefunction(select_method):
+            return await select_method(context.select_query, *select_params)
+        return select_method(context.select_query, *select_params)
+
+    return process_select
+
+
+def _create_count_processor(query_engine: SelectEngine):
+
+    async def process_count(context: QueryContext) -> int:
+        count_params = context.count_params or []
+        if context.count_query is None:
+            raise ValueError(f"select_count is not defined at this context: {context}")
+        select_count_method = query_engine.select_count
+        if inspect.iscoroutinefunction(select_count_method):
+            return await select_count_method(context.count_query, *count_params)
+        return select_count_method(context.count_query, *count_params)
+    
+    return process_count
+
+
 def _create_query_processor(query_engine: SelectEngine, response_model: type[BaseModel]):
-    # TODO: Modify this guy or split it into several functions (select only or count only)
 
     async def process_query(context: QueryContext):
-        select_params = context.select_params if context.select_params is not None else []
-        
+        select_params = context.select_params or []
         # Check if select method is a coroutine
         select_method = query_engine.select
         if inspect.iscoroutinefunction(select_method):
             data = await select_method(context.select_query, *select_params)
         else:
             data = select_method(context.select_query, *select_params)
-        
         if context.count_query:
             count_params = context.count_params or []
             # Check if select_count method is a coroutine
@@ -227,6 +293,16 @@ def _create_query_processor(query_engine: SelectEngine, response_model: type[Bas
         return response_model(data=data, count=len(data))
 
     return process_query
+
+
+def _get_combined_middlewares(
+    global_middlewares: list[Middleware] | None,
+    local_middlewares: list[Middleware] | None,
+) -> list[Middleware] | None:
+    normalized_global_middlewares = global_middlewares or []
+    normalized_local_middlewares = local_middlewares or []
+    return list(normalized_global_middlewares) + list(normalized_local_middlewares)
+
 
 def _create_middleware_chain(
     middlewares: list[Middleware] | None,
