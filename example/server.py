@@ -72,20 +72,23 @@ serve_select(
 
 serve_union(
     app=app,
-    sources=[
-        SelectSource(
+    sources={
+        "sqlite": SelectSource(
             query_engine=sqlite_query_engine,
             select_query="SELECT * FROM books LIMIT ? OFFSET ?",
+            count_query="SELECT COUNT(1) FROM books",
         ),
-        SelectSource(
+        "psql": SelectSource(
             query_engine=pgsql_query_engine,
             select_query="SELECT * FROM books LIMIT %s OFFSET %s",
+            count_query="SELECT COUNT(1) FROM books",
         ),
-        SelectSource(
+        "mysql": SelectSource(
             query_engine=mysql_query_engine,
             select_query="SELECT * FROM books LIMIT %s OFFSET %s",
+            count_query="SELECT COUNT(1) FROM books",
         ),
-    ],
+    },
     path="/api/v1/all/books",
     description="Get all books from sqlite, postgre, and mysql"
 )
