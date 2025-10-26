@@ -398,6 +398,57 @@ python -m example.server
 
 The union endpoint (`/api/v1/all/books`) demonstrates how DBAnu can seamlessly combine results from multiple databases, returning books from SQLite, PostgreSQL, and MySQL in a single response.
 
+## Testing
+
+DBAnu includes comprehensive tests to ensure the priority-based union pagination works correctly.
+
+### Running Tests
+
+```bash
+# Install test dependencies
+poetry install --with test
+
+# Run all tests
+poetry run pytest tests/ -v
+
+# Run specific test file
+poetry run pytest tests/test_union_logic.py -v
+```
+
+### Union Query with Priority-Based Pagination
+
+The `serve_union` function now supports priority-based pagination across multiple data sources. Instead of applying the same limit/offset to each source independently, it treats all sources as one big virtual table and distributes the pagination based on priority.
+
+#### How it works:
+
+1. **Count Records**: First, count the total records in each source
+2. **Priority Distribution**: Apply limit/offset across sources in priority order
+3. **Smart Fetching**: Only fetch the needed records from each source
+
+#### Example:
+
+```python
+# Sources with different record counts
+sources = {
+    "source-1": 3 records,  # ["s1-r1", "s1-r2", "s1-r3"]
+    "source-2": 4 records,  # ["s2-r1", "s2-r2", "s2-r3", "s2-r4"]
+    "source-3": 5 records,  # ["s3-r1", "s3-r2", "s3-r3", "s3-r4", "s3-r5"]
+}
+
+priority = ["source-1", "source-2", "source-3"]
+limit = 5
+offset = 3
+
+# Result: ["s2-r1", "s2-r2", "s2-r3", "s2-r4", "s3-r1"]
+```
+
+**Explanation:**
+- Offset 3 skips all 3 records from source-1
+- Source-2 provides 4 records (all of them)
+- Source-3 provides 1 record to reach the limit of 5
+
+This ensures proper pagination across the combined dataset rather than getting 15 records (5 from each source).
+
 ## License
 
 MIT
