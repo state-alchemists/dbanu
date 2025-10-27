@@ -9,7 +9,7 @@ license = {text = "MIT"}
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
-    "fastapi (>=0.118.3,<0.119.0)",
+    "fastapi (>=0.118.3)",
     "psycopg2-binary (>=2.9.11,<3.0.0)",
     "mysql-connector-python (>=9.4.0,<10.0.0)"
 ]
