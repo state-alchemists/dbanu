@@ -174,6 +174,25 @@ serve_select(
 
 The `serve_union` function allows you to query multiple databases simultaneously and combine their results. This is useful when you have data distributed across different database systems.
 
+#### Parameters
+
+- `app`: FastAPI application instance
+- `sources`: List of `SelectSource` objects, each containing:
+  - `query_engine`: Database query engine for this source
+  - `select_query`: SQL SELECT query string
+  - `select_param`: Optional function to generate query parameters
+  - `count_query`: Optional SQL COUNT query
+  - `count_param`: Optional function for COUNT parameters
+- `path`: API endpoint path (default: "/get")
+- `filter_model`: Pydantic model for filtering (applies to all sources)
+- `data_model`: Pydantic model for response data
+- `dependencies`: List of FastAPI dependencies
+- `middlewares`: List of middleware functions
+- `summary`: Optional API endpoint summary
+- `description`: Optional API endpoint description
+
+#### Example
+
 ```python
 from fastapi import FastAPI
 from dbanu import serve_union, SelectSource, SQLiteQueryEngine, PostgreSQLQueryEngine, MySQLQueryEngine
@@ -194,20 +213,20 @@ mysql_engine = MySQLQueryEngine(
 # Define sources with different databases
 serve_union(
     app=app,
-    sources=[
-        SelectSource(
+    sources={
+        "sqlite": SelectSource(
             query_engine=sqlite_engine,
             select_query="SELECT * FROM books LIMIT ? OFFSET ?",
         ),
-        SelectSource(
+        "psql": SelectSource(
             query_engine=pgsql_engine,
             select_query="SELECT * FROM books LIMIT %s OFFSET %s",
         ),
-        SelectSource(
+        "mysql": SelectSource(
             query_engine=mysql_engine,
             select_query="SELECT * FROM books LIMIT %s OFFSET %s",
         ),
-    ],
+    },
     path="/api/all-books",
     description="Get books from all databases (SQLite, PostgreSQL, MySQL)"
 )
@@ -278,22 +297,7 @@ query_engine = MySQLQueryEngine(
 - `summary`: Optional API endpoint summary
 - `description`: Optional API endpoint description
 
-### `serve_union` Parameters
 
-- `app`: FastAPI application instance
-- `sources`: List of `SelectSource` objects, each containing:
-  - `query_engine`: Database query engine for this source
-  - `select_query`: SQL SELECT query string
-  - `select_param`: Optional function to generate query parameters
-  - `count_query`: Optional SQL COUNT query
-  - `count_param`: Optional function for COUNT parameters
-- `path`: API endpoint path (default: "/get")
-- `filter_model`: Pydantic model for filtering (applies to all sources)
-- `data_model`: Pydantic model for response data
-- `dependencies`: List of FastAPI dependencies
-- `middlewares`: List of middleware functions
-- `summary`: Optional API endpoint summary
-- `description`: Optional API endpoint description
 
 ### Middleware System
 
