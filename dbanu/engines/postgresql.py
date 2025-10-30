@@ -1,21 +1,25 @@
+"""
+PostgreSQL query engine
+"""
+
 from typing import Any
 
-import mysql.connector
+import psycopg2
 
-from dbanu.select_route import SelectEngine
+from dbanu.engines.base import BaseQueryEngine
 
 
-class MySQLQueryEngine(SelectEngine):
+class PostgreSQLQueryEngine(BaseQueryEngine):
     """
-    A MySQL query engine that connects to a MySQL database.
+    A PostgreSQL query engine that connects to a PostgreSQL database.
     """
 
     def __init__(
         self,
         host: str = "localhost",
-        port: int = 3306,
-        database: str = "mysql",
-        user: str = "root",
+        port: int = 5432,
+        database: str = "postgres",
+        user: str = "postgres",
         password: str = "",
     ):
         self._host = host
@@ -32,15 +36,15 @@ class MySQLQueryEngine(SelectEngine):
         }
 
     def _get_connection(self):
-        """Get a connection to the MySQL database."""
-        return mysql.connector.connect(**self._connection_params)
+        """Get a connection to the PostgreSQL database."""
+        return psycopg2.connect(**self._connection_params)
 
     def select(self, query: str, *params: Any) -> list[Any]:
         """
-        Execute a SELECT query against the MySQL database.
+        Execute a SELECT query against the PostgreSQL database.
         """
         conn = self._get_connection()
-        cursor = conn.cursor(dictionary=True)
+        cursor = conn.cursor()
 
         try:
             # Execute the query with parameters
@@ -49,23 +53,30 @@ class MySQLQueryEngine(SelectEngine):
             else:
                 cursor.execute(query)
 
-            # Fetch results (MySQL connector with dictionary=True returns dicts)
+            # Fetch results
             results = cursor.fetchall()
 
             # Convert to list of dictionaries for Pydantic compatibility
-            # MySQL connector with dictionary=True already returns dicts
-            return list(results) if results else []
+            if results and len(results) > 0:
+                # Get column names
+                column_names = [description[0] for description in cursor.description]
+                # Convert each row to a dictionary
+                dict_results = []
+                for row in results:
+                    dict_results.append(dict(zip(column_names, row)))
+                return dict_results
+            else:
+                return []
 
         except Exception as e:
-            print(f"Query execution error: {e}")
-            return []
+            return self._handle_query_error(e, "SELECT")
         finally:
             cursor.close()
             conn.close()
 
     def select_count(self, query: str, *params: Any) -> int:
         """
-        Execute a COUNT query against the MySQL database.
+        Execute a COUNT query against the PostgreSQL database.
         """
         conn = self._get_connection()
         cursor = conn.cursor()
@@ -82,8 +93,7 @@ class MySQLQueryEngine(SelectEngine):
             return result[0] if result else 0
 
         except Exception as e:
-            print(f"Count query execution error: {e}")
-            return 0
+            return self._handle_query_error(e, "COUNT")
         finally:
             cursor.close()
             conn.close()

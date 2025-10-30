@@ -1,10 +1,14 @@
+"""
+SQLite query engine
+"""
+
 import sqlite3
 from typing import Any
 
-from dbanu.select_route import SelectEngine
+from dbanu.engines.base import BaseQueryEngine
 
 
-class SQLiteQueryEngine(SelectEngine):
+class SQLiteQueryEngine(BaseQueryEngine):
     """
     A real SQLite query engine that connects to an actual database.
     """
@@ -49,8 +53,7 @@ class SQLiteQueryEngine(SelectEngine):
                 return []
 
         except Exception as e:
-            print(f"Query execution error: {e}")
-            return []
+            return self._handle_query_error(e, "SELECT")
         finally:
             conn.close()
 
@@ -76,7 +79,6 @@ class SQLiteQueryEngine(SelectEngine):
             return result[0] if result else 0
 
         except Exception as e:
-            print(f"Count query execution error: {e}")
-            return 0
+            return self._handle_query_error(e, "COUNT")
         finally:
             conn.close()

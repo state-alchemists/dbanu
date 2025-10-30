@@ -1,12 +1,27 @@
-from dbanu.query_engines.mysql import MySQLQueryEngine
-from dbanu.query_engines.postgresql import PostgreSQLQueryEngine
-from dbanu.query_engines.sqlite import SQLiteQueryEngine
-from dbanu.select_route import QueryContext, SelectEngine, SelectSource, serve_select, serve_union
+"""
+DBAnu - FastAPI SQL Query Engine
 
+A lightweight Python library that simplifies creating FastAPI endpoints for SQL queries.
+"""
+
+from dbanu.api import SelectSource, serve_select, serve_union
+from dbanu.core import QueryContext
+from dbanu.engines import MySQLQueryEngine, PostgreSQLQueryEngine, SQLiteQueryEngine
+
+__all__ = [
+    "MySQLQueryEngine",
+    "PostgreSQLQueryEngine",
+    "SQLiteQueryEngine",
+    "QueryContext",
+    "SelectSource",
+    "serve_select",
+    "serve_union",
+]
+
+# Assert all exports for backward compatibility
 assert MySQLQueryEngine
 assert PostgreSQLQueryEngine
 assert QueryContext
-assert SelectEngine
 assert SQLiteQueryEngine
 assert SelectSource
 assert serve_select

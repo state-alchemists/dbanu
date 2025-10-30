@@ -7,8 +7,8 @@ from dbanu import (
     MySQLQueryEngine,
     PostgreSQLQueryEngine,
     QueryContext,
-    SQLiteQueryEngine,
     SelectSource,
+    SQLiteQueryEngine,
     serve_select,
     serve_union,
 )
@@ -90,7 +90,7 @@ serve_union(
         ),
     },
     path="/api/v1/all/books",
-    description="Get all books from sqlite, postgre, and mysql"
+    description="Get all books from sqlite, postgre, and mysql",
 )
 
 # 2. Register the books endpoint with filters
