@@ -1,29 +1,89 @@
-# DBAnu - FastAPI SQL Query Engine
+# 🚀 DBAnu - The Ultimate FastAPI SQL Query Engine
 
-DBAnu is a lightweight Python library that simplifies creating FastAPI endpoints for SQL queries. It provides a clean, type-safe interface for exposing database queries as RESTful APIs with built-in support for filtering, pagination, dependency injection, and middleware.
+**Transform your SQL queries into production-ready REST APIs in minutes, not hours.**
 
-## Features
+DBAnu is a revolutionary Python library that eliminates the boilerplate of creating database APIs. With just a few lines of code, you can expose any SQL query as a fully-featured FastAPI endpoint with built-in filtering, pagination, authentication, logging, and even multi-database union queries.
 
-- **Type-Safe Query Generation**: Automatically generate FastAPI routes from SQL queries
-- **Multi-Database Union Queries**: Combine results from multiple databases with `serve_union`
-- **Flexible Filtering**: Support for complex filtering with Pydantic models
-- **Built-in Pagination**: Automatic limit/offset pagination support
-- **FastAPI Integration**: Seamless integration with FastAPI dependencies and middleware
-- **Multiple Database Support**: SQLite, PostgreSQL, MySQL, and custom engines
-- **Dependency Injection**: Access FastAPI dependencies in middleware
-- **Middleware System**: Powerful middleware system with `QueryContext` for intercepting and modifying queries, logging, authentication, authorization, and more
+## ✨ Why DBAnu Matters
 
-## Installation
+### The Problem: Database API Development is Repetitive
+
+Building database APIs typically involves:
+- Writing the same CRUD endpoints repeatedly
+- Implementing pagination logic over and over
+- Adding authentication checks to every endpoint
+- Creating complex filtering systems
+- Handling database connection management
+- Writing extensive validation logic
+
+### The Solution: DBAnu Automates the Boring Parts
+
+DBAnu turns this:
+
+```python
+# Traditional approach - 50+ lines of boilerplate
+@app.get("/api/books")
+async def get_books(
+    author: str = None, 
+    min_year: int = None,
+    limit: int = 100, 
+    offset: int = 0
+):
+    # Validate inputs
+    # Build dynamic WHERE clause
+    # Handle pagination
+    # Execute query
+    # Format response
+    # Handle errors
+    # Add logging
+    # Check authentication
+    # ... and much more
+```
+
+Into this:
+
+```python
+# DBAnu approach - 3 lines of code
+serve_select(
+    app=app,
+    query_engine=query_engine,
+    path="/api/books",
+    select_query="SELECT * FROM books LIMIT ? OFFSET ?"
+)
+```
+
+## 🎯 Key Features That Make DBAnu Special
+
+### 🚀 **Instant API Generation**
+Turn any SQL query into a REST endpoint in seconds
+
+### 🔄 **Multi-Database Union Queries**
+Combine results from SQLite, PostgreSQL, MySQL in a single API call
+
+### 🛡️ **Type-Safe Everything**
+Pydantic-powered validation for filters, responses, and middleware
+
+### 🔧 **Powerful Middleware System**
+Intercept and modify queries, add logging, authentication, and more
+
+### 📊 **Smart Pagination**
+Built-in pagination with priority-based union pagination across databases
+
+### 🔌 **Seamless FastAPI Integration**
+Works with all FastAPI features - dependencies, background tasks, WebSockets
+
+### 🎨 **Flexible Filtering**
+Define complex filters with Pydantic models, automatically applied to your queries
+
+## 🚀 Quick Start
+
+### Installation
 
 ```bash
 pip install dbanu
 ```
 
-## Quick Start
-
-### Basic Usage
-
-Create a simple FastAPI endpoint with SQLite:
+### From Zero to API in 60 Seconds
 
 ```python
 from fastapi import FastAPI
@@ -34,41 +94,71 @@ app = FastAPI()
 # Create a SQLite query engine
 query_engine = SQLiteQueryEngine()
 
-# Register a simple endpoint
+# 🎉 Create your first API endpoint
 serve_select(
     app=app,
     query_engine=query_engine,
     path="/api/books",
     select_query="SELECT id, title, author FROM books LIMIT ? OFFSET ?",
-    select_param=lambda filters, limit, offset: [limit, offset]
+    count_query="SELECT COUNT(*) FROM books"
 )
 ```
 
-### Advanced Usage with Filtering
+**That's it!** You now have a fully functional API with:
+- ✅ Automatic pagination (`limit` and `offset` parameters)
+- ✅ Total count for frontend pagination
+- ✅ Proper error handling
+- ✅ FastAPI documentation at `/docs`
+
+## 📚 Usage Examples - From Simple to Complex
+
+### Level 1: Basic Query Endpoint
 
 ```python
-from pydantic import BaseModel
 from fastapi import FastAPI
 from dbanu import serve_select, SQLiteQueryEngine
 
 app = FastAPI()
+query_engine = SQLiteQueryEngine()
 
-# Define filter model
+# Simple books endpoint
+serve_select(
+    app=app,
+    query_engine=query_engine,
+    path="/api/books",
+    select_query="SELECT * FROM books LIMIT ? OFFSET ?",
+    count_query="SELECT COUNT(*) FROM books"
+)
+```
+
+**Usage:**
+```bash
+GET /api/books?limit=10&offset=0
+```
+
+### Level 2: Advanced Filtering
+
+```python
+from pydantic import BaseModel
+from dbanu import serve_select, SQLiteQueryEngine
+
+app = FastAPI()
+
+# Define your filter model
 class BookFilter(BaseModel):
     author: str | None = None
     min_year: int | None = None
+    max_year: int | None = None
 
-# Define data model
+# Define your response model
 class BookData(BaseModel):
     id: int
     title: str
     author: str
     year: int
 
-# Create query engine
 query_engine = SQLiteQueryEngine()
 
-# Register endpoint with filtering
 serve_select(
     app=app,
     query_engine=query_engine,
@@ -79,119 +169,38 @@ serve_select(
         "SELECT id, title, author, year FROM books "
         "WHERE (author = ? OR ? IS NULL) "
         "AND (year >= ? OR ? IS NULL) "
+        "AND (year <= ? OR ? IS NULL) "
         "LIMIT ? OFFSET ?"
     ),
     select_param=lambda filters, limit, offset: [
         filters.author, filters.author,
         filters.min_year, filters.min_year,
+        filters.max_year, filters.max_year,
         limit, offset
     ],
     count_query=(
         "SELECT COUNT(*) FROM books "
         "WHERE (author = ? OR ? IS NULL) "
-        "AND (year >= ? OR ? IS NULL)"
+        "AND (year >= ? OR ? IS NULL) "
+        "AND (year <= ? OR ? IS NULL)"
     ),
     count_param=lambda filters: [
         filters.author, filters.author,
-        filters.min_year, filters.min_year
+        filters.min_year, filters.min_year,
+        filters.max_year, filters.max_year
     ]
 )
 ```
 
-### Full Example with Dependencies and Middleware
-
-```python
-from fastapi import Depends, FastAPI, HTTPException
-from pydantic import BaseModel
-from dbanu import SQLiteQueryEngine, QueryContext, serve_select
-
-app = FastAPI()
-query_engine = SQLiteQueryEngine()
-
-# Define models
-class BookFilter(BaseModel):
-    author: str | None = None
-    min_year: int | None = None
-
-class BookData(BaseModel):
-    id: int
-    title: str
-    author: str
-    year: int
-
-# Example dependencies
-async def get_current_user():
-    return {"user_id": 1, "username": "demo_user"}
-
-# Example middlewares
-def logging_middleware(context: QueryContext, next_handler):
-    user_info = context.dependency_results.get("get_current_user", {})
-    username = user_info.get("username", "anonymous")
-    print(f"Request from {username}: filters={context.filters.model_dump()}")
-    result = next_handler()
-    print(f"Response: {len(result.data)} items")
-    return result
-
-def authorization_middleware(context: QueryContext, next_handler):
-    current_user = context.dependency_results.get("get_current_user")
-    if not current_user:
-        raise HTTPException(status_code=401, detail="Authentication required")
-    return next_handler()
-
-# Register endpoint with dependencies and middleware
-serve_select(
-    app=app,
-    query_engine=query_engine,
-    path="/api/books",
-    filter_model=BookFilter,
-    data_model=BookData,
-    select_query=(
-        "SELECT id, title, author, year FROM books "
-        "WHERE (author = ? OR ? IS NULL) "
-        "AND (year >= ? OR ? IS NULL) "
-        "LIMIT ? OFFSET ?"
-    ),
-    select_param=lambda filters, limit, offset: [
-        filters.author, filters.author,
-        filters.min_year, filters.min_year,
-        limit, offset
-    ],
-    count_query=(
-        "SELECT COUNT(*) FROM books "
-        "WHERE (author = ? OR ? IS NULL) "
-        "AND (year >= ? OR ? IS NULL)"
-    ),
-    count_param=lambda filters: [
-        filters.author, filters.author,
-        filters.min_year, filters.min_year
-    ],
-    dependencies=[Depends(get_current_user)],
-    middlewares=[logging_middleware, authorization_middleware]
-)
+**Usage:**
+```bash
+# Get books by Stephen King published after 2000
+GET /api/books?author=Stephen%20King&min_year=2000&limit=10&offset=0
 ```
 
-### Using Union Queries - Combining Multiple Databases
+### Level 3: Multi-Database Union Queries
 
-The `serve_union` function allows you to query multiple databases simultaneously and combine their results. This is useful when you have data distributed across different database systems.
-
-#### Parameters
-
-- `app`: FastAPI application instance
-- `sources`: List of `SelectSource` objects, each containing:
-  - `query_engine`: Database query engine for this source
-  - `select_query`: SQL SELECT query string
-  - `select_param`: Optional function to generate query parameters
-  - `count_query`: Optional SQL COUNT query
-  - `count_param`: Optional function for COUNT parameters
-- `path`: API endpoint path (default: "/get")
-- `filter_model`: Pydantic model for filtering (applies to all sources)
-- `data_model`: Pydantic model for response data
-- `dependencies`: List of FastAPI dependencies
-- `middlewares`: List of middleware functions
-- `summary`: Optional API endpoint summary
-- `description`: Optional API endpoint description
-
-#### Example
+**Query multiple databases simultaneously and get unified results!**
 
 ```python
 from fastapi import FastAPI
@@ -199,63 +208,141 @@ from dbanu import serve_union, SelectSource, SQLiteQueryEngine, PostgreSQLQueryE
 
 app = FastAPI()
 
-# Create query engines for different databases
-sqlite_engine = SQLiteQueryEngine()
+# Create engines for different databases
+sqlite_engine = SQLiteQueryEngine(db_path="./classic_literature.db")
 pgsql_engine = PostgreSQLQueryEngine(
-    host="localhost", port=5432, database="books_db", 
+    host="localhost", port=5432, database="fantasy_books", 
     user="user", password="password"
 )
 mysql_engine = MySQLQueryEngine(
-    host="localhost", port=3306, database="books_db",
+    host="localhost", port=3306, database="scifi_books",
     user="user", password="password"
 )
 
-# Define sources with different databases
+# Combine all databases in one endpoint
 serve_union(
     app=app,
     sources={
-        "sqlite": SelectSource(
+        "classics": SelectSource(
             query_engine=sqlite_engine,
-            select_query="SELECT * FROM books LIMIT ? OFFSET ?",
+            select_query="SELECT *, 'classic' as genre FROM books LIMIT ? OFFSET ?",
+            count_query="SELECT COUNT(*) FROM books"
         ),
-        "psql": SelectSource(
+        "fantasy": SelectSource(
             query_engine=pgsql_engine,
-            select_query="SELECT * FROM books LIMIT %s OFFSET %s",
+            select_query="SELECT *, 'fantasy' as genre FROM books LIMIT %s OFFSET %s",
+            count_query="SELECT COUNT(*) FROM books"
         ),
-        "mysql": SelectSource(
+        "scifi": SelectSource(
             query_engine=mysql_engine,
-            select_query="SELECT * FROM books LIMIT %s OFFSET %s",
+            select_query="SELECT *, 'scifi' as genre FROM books LIMIT %s OFFSET %s",
+            count_query="SELECT COUNT(*) FROM books"
         ),
     },
     path="/api/all-books",
-    description="Get books from all databases (SQLite, PostgreSQL, MySQL)"
+    description="Get books from all databases combined"
 )
 ```
 
-This will create an endpoint that queries all three databases and returns a combined result set. Each database can contain different data - for example:
-- **SQLite**: Classic Literature books
-- **PostgreSQL**: Fantasy books  
-- **MySQL**: Science Fiction books
+**Usage:**
+```bash
+# Get books from ALL databases in one call
+GET /api/all-books?limit=20&offset=0
 
-The response will include all books from all three databases in a single unified response.
+# Control source priority (fantasy books first, then scifi, then classics)
+GET /api/all-books?limit=20&offset=0&priority=fantasy,scifi,classics
+```
 
-For a complete example with more advanced middleware usage, please see `example/server.py`.
-
-## Database Engines
-
-### SQLite
+### Level 4: Enterprise-Grade with Middleware & Dependencies
 
 ```python
-from dbanu import SQLiteQueryEngine
+from fastapi import Depends, FastAPI, HTTPException
+from dbanu import serve_select, SQLiteQueryEngine, QueryContext
+import time
 
+app = FastAPI()
+query_engine = SQLiteQueryEngine()
+
+# Authentication dependency
+async def get_current_user():
+    return {"user_id": 1, "username": "demo_user", "role": "admin"}
+
+# Rate limiting dependency
+async def rate_limit_check():
+    return True
+
+# Middleware: Logging
+def logging_middleware(context: QueryContext, next_handler):
+    user_info = context.dependency_results.get("get_current_user", {})
+    username = user_info.get("username", "anonymous")
+    print(f"📝 Request from {username}: {context.filters.model_dump()}")
+    result = next_handler()
+    print(f"📝 Response: {len(result.data)} items")
+    return result
+
+# Middleware: Timing
+def timing_middleware(context: QueryContext, next_handler):
+    start_time = time.time()
+    result = next_handler()
+    end_time = time.time()
+    print(f"⏱️ Query took {end_time - start_time:.3f}s")
+    return result
+
+# Middleware: Authorization
+def authorization_middleware(context: QueryContext, next_handler):
+    current_user = context.dependency_results.get("get_current_user")
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Authentication required")
+    
+    # Role-based access control
+    if current_user.get("role") not in ["admin", "editor"]:
+        raise HTTPException(status_code=403, detail="Insufficient permissions")
+    
+    return next_handler()
+
+# Create the enterprise endpoint
+serve_select(
+    app=app,
+    query_engine=query_engine,
+    path="/api/secure/books",
+    filter_model=BookFilter,
+    data_model=BookData,
+    select_query=(
+        "SELECT id, title, author, year FROM books "
+        "WHERE (author = ? OR ? IS NULL) "
+        "AND (year >= ? OR ? IS NULL) "
+        "LIMIT ? OFFSET ?"
+    ),
+    select_param=lambda filters, limit, offset: [
+        filters.author, filters.author,
+        filters.min_year, filters.min_year,
+        limit, offset
+    ],
+    count_query=(
+        "SELECT COUNT(*) FROM books "
+        "WHERE (author = ? OR ? IS NULL) "
+        "AND (year >= ? OR ? IS NULL)"
+    ),
+    count_param=lambda filters: [
+        filters.author, filters.author,
+        filters.min_year, filters.min_year
+    ],
+    dependencies=[Depends(get_current_user), Depends(rate_limit_check)],
+    middlewares=[logging_middleware, authorization_middleware, timing_middleware]
+)
+```
+
+## 🏗️ Database Engines
+
+### SQLite
+```python
+from dbanu import SQLiteQueryEngine
 query_engine = SQLiteQueryEngine(db_path="./database.db")
 ```
 
 ### PostgreSQL
-
 ```python
 from dbanu import PostgreSQLQueryEngine
-
 query_engine = PostgreSQLQueryEngine(
     host="localhost",
     port=5432,
@@ -266,10 +353,8 @@ query_engine = PostgreSQLQueryEngine(
 ```
 
 ### MySQL
-
 ```python
 from dbanu import MySQLQueryEngine
-
 query_engine = MySQLQueryEngine(
     host="localhost",
     port=3306,
@@ -279,157 +364,134 @@ query_engine = MySQLQueryEngine(
 )
 ```
 
-## API Reference
+## 🔧 Advanced Features
 
-### `serve_select` Parameters
-
-- `app`: FastAPI application instance
-- `query_engine`: Database query engine (SQLite, PostgreSQL, or MySQL)
-- `select_query`: SQL SELECT query string
-- `select_param`: Function to generate query parameters from filters
-- `count_query`: Optional SQL COUNT query for pagination
-- `count_param`: Function to generate COUNT query parameters
-- `path`: API endpoint path (default: "/get")
-- `filter_model`: Pydantic model for filtering
-- `data_model`: Pydantic model for response data
-- `dependencies`: List of FastAPI dependencies
-- `middlewares`: List of middleware functions that receive `QueryContext`
-- `summary`: Optional API endpoint summary
-- `description`: Optional API endpoint description
-
-
-
-### Middleware System
-
-DBAnu provides a powerful middleware system that allows you to intercept and modify queries, add logging, implement authentication, and more. Middleware functions receive a `QueryContext` object containing all query-related data and a `next_handler` callable to continue the middleware chain.
-
-#### Middleware Signature
-
-```python
-from dbanu import QueryContext
-
-def middleware_name(context: QueryContext, next_handler: Callable) -> Any:
-    # Your middleware logic
-    return next_handler()
-```
-
-#### QueryContext Object
-
-The `QueryContext` contains all the data available to middleware:
-
-```python
-class QueryContext(BaseModel):
-    select_query: str           # The SELECT query string
-    select_params: list[Any]    # Parameters for SELECT query
-    count_query: Optional[str]  # The COUNT query string (optional)
-    count_params: list[Any]     # Parameters for COUNT query
-    filters: BaseModel          # Filter model instance
-    limit: int                  # Pagination limit
-    offset: int                 # Pagination offset
-    dependency_results: dict[str, Any]  # Results from FastAPI dependencies
-```
-
-#### Example Middleware Implementations
-
-**Logging Middleware:**
-```python
-def logging_middleware(context: QueryContext, next_handler):
-    user_info = context.dependency_results.get("get_current_user", {})
-    username = user_info.get("username", "anonymous")
-    print(f"Request from {username}: filters={context.filters.model_dump()}")
-    print(f"Select query: {context.select_query}")
-    print(f"Select params: {context.select_params}")
-    result = next_handler()
-    print(f"Response: {len(result.data)} items")
-    return result
-```
-
-**Authorization Middleware:**
-```python
-def authorization_middleware(context: QueryContext, next_handler):
-    current_user = context.dependency_results.get("get_current_user")
-    if not current_user:
-        raise HTTPException(status_code=401, detail="Authentication required")
-    # Add custom authorization logic here
-    return next_handler()
-```
+### Custom Middleware Examples
 
 **Query Modification Middleware:**
 ```python
 def query_modification_middleware(context: QueryContext, next_handler):
-    # Modify the query or parameters
-    context.select_query = context.select_query.replace("__table__", "books")
-    context.select_params = [context.limit, context.offset]
+    # Add tenant filtering
+    tenant_id = context.dependency_results.get("tenant_id")
+    if tenant_id:
+        context.select_query = context.select_query.replace(
+            "WHERE", f"WHERE tenant_id = {tenant_id} AND"
+        )
     return next_handler()
 ```
 
-## Running the Example
+**Caching Middleware:**
+```python
+import redis
+redis_client = redis.Redis()
 
-The example demonstrates DBAnu with three different databases, each containing different book collections:
+def caching_middleware(context: QueryContext, next_handler):
+    cache_key = f"query:{context.select_query}:{context.select_params}"
+    cached = redis_client.get(cache_key)
+    if cached:
+        return cached
+    
+    result = next_handler()
+    redis_client.setex(cache_key, 300, result)  # Cache for 5 minutes
+    return result
+```
 
-### Sample Data Distribution
+**Data Transformation Middleware:**
+```python
+def data_transformation_middleware(context: QueryContext, next_handler):
+    result = next_handler()
+    # Transform data before returning
+    for item in result.data:
+        item["formatted_title"] = item["title"].title()
+    return result
+```
 
-- **SQLite Database** (`example/sample.db`):
-  - Classic Literature: The Great Gatsby, To Kill a Mockingbird, 1984, Pride and Prejudice, etc.
+## 🎯 Real-World Use Cases
 
-- **PostgreSQL Database**:
-  - Fantasy Books: The Hobbit, Harry Potter series, Game of Thrones, The Name of the Wind, etc.
+### E-commerce Platform
+```python
+# Combine product data from multiple sources
+serve_union(
+    app=app,
+    sources={
+        "main_products": SelectSource(...),  # Primary PostgreSQL
+        "legacy_products": SelectSource(...),  # Legacy MySQL
+        "external_products": SelectSource(...),  # External API via SQLite
+    },
+    path="/api/products"
+)
+```
 
-- **MySQL Database**:
-  - Science Fiction: Dune, Foundation, Neuromancer, The Martian, Ready Player One, etc.
+### Multi-tenant SaaS Application
+```python
+# Automatic tenant isolation
+serve_select(
+    app=app,
+    path="/api/customers",
+    dependencies=[Depends(get_tenant_id)],
+    middlewares=[tenant_isolation_middleware]
+)
+```
 
-### Running with Docker Compose
+### Analytics Dashboard
+```python
+# Real-time data from multiple databases
+serve_union(
+    app=app,
+    sources={
+        "user_metrics": SelectSource(...),  # User database
+        "sales_data": SelectSource(...),    # Sales database
+        "web_analytics": SelectSource(...), # Analytics database
+    },
+    path="/api/dashboard/metrics"
+)
+```
 
-1. Start the databases:
+## 🚀 Running the Complete Example
+
+### Quick Demo with Docker
+
+1. **Start the demo environment:**
 ```bash
 cd example
 docker-compose up -d
 ```
 
-2. Initialize SQLite and run the server:
+2. **Run the example server:**
 ```bash
 python -m example.server
 ```
 
-3. Visit http://localhost:8000/docs to test the API
+3. **Explore the APIs:**
+   - Visit http://localhost:8000/docs
+   - Test different endpoints:
+     - `/api/v1/sqlite/books` - Classic literature
+     - `/api/v1/pgsql/books` - Fantasy books  
+     - `/api/v1/mysql/books` - Science fiction
+     - `/api/v1/all/books` - **All books combined!**
 
-### Available Endpoints
+### Sample Data Distribution
 
-- `/api/v1/books` - Get books from SQLite (Classic Literature)
-- `/api/v1/all/books` - Get books from ALL databases combined (Union query)
-- `/api/v2/books` - Books with filtering support
-- `/api/v3/books` - Books with authentication and logging middleware
+- **SQLite**: Classic Literature (The Great Gatsby, 1984, etc.)
+- **PostgreSQL**: Fantasy (Harry Potter, Game of Thrones, etc.)
+- **MySQL**: Science Fiction (Dune, Foundation, Neuromancer, etc.)
 
-The union endpoint (`/api/v1/all/books`) demonstrates how DBAnu can seamlessly combine results from multiple databases, returning books from SQLite, PostgreSQL, and MySQL in a single response.
-
-## Testing
-
-DBAnu includes comprehensive tests to ensure the priority-based union pagination works correctly.
-
-### Running Tests
+## 🧪 Testing
 
 ```bash
 # Install test dependencies
-poetry install --with test
+pip install pytest pytest-asyncio
 
 # Run all tests
-poetry run pytest tests/ -v
+pytest tests/ -v
 
-# Run specific test file
-poetry run pytest tests/test_union_logic.py -v
+# Run specific tests
+pytest tests/test_union_logic.py -v
 ```
 
-### Union Query with Priority-Based Pagination
+## 🔍 How Union Pagination Works
 
-The `serve_union` function now supports priority-based pagination across multiple data sources. Instead of applying the same limit/offset to each source independently, it treats all sources as one big virtual table and distributes the pagination based on priority.
-
-#### How it works:
-
-1. **Count Records**: First, count the total records in each source
-2. **Priority Distribution**: Apply limit/offset across sources in priority order
-3. **Smart Fetching**: Only fetch the needed records from each source
-
-#### Example:
+DBAnu uses **priority-based pagination** for union queries:
 
 ```python
 # Sources with different record counts
@@ -453,6 +515,36 @@ offset = 3
 
 This ensures proper pagination across the combined dataset rather than getting 15 records (5 from each source).
 
-## License
+## 📖 API Reference
+
+### `serve_select` Parameters
+
+- `app`: FastAPI application instance
+- `query_engine`: Database query engine (SQLite, PostgreSQL, or MySQL)
+- `select_query`: SQL SELECT query string
+- `select_param`: Function to generate query parameters from filters
+- `count_query`: Optional SQL COUNT query for pagination
+- `count_param`: Function to generate COUNT query parameters
+- `path`: API endpoint path (default: "/get")
+- `filter_model`: Pydantic model for filtering
+- `data_model`: Pydantic model for response data
+- `dependencies`: List of FastAPI dependencies
+- `middlewares`: List of middleware functions that receive `QueryContext`
+- `summary`: Optional API endpoint summary
+- `description`: Optional API endpoint description
+
+### `serve_union` Parameters
+
+- `app`: FastAPI application instance
+- `sources`: Dictionary of `SelectSource` objects for each database
+- `path`: API endpoint path (default: "/get")
+- `filter_model`: Pydantic model for filtering (applies to all sources)
+- `data_model`: Pydantic model for response data
+- `dependencies`: List of FastAPI dependencies
+- `middlewares`: List of middleware functions
+- `summary`: Optional API endpoint summary
+- `description`: Optional API endpoint description
+
+## 📄 License
 
 MIT
