@@ -49,7 +49,10 @@ Combine results from SQLite, PostgreSQL, MySQL in a single API call
 Pydantic-powered validation for filters, responses, and middleware
 
 ### 🔧 **Powerful Middleware System**
-Intercept and modify queries, add logging, authentication, and more
+Intercept and modify queries, add logging, authentication, and more. **Middleware functions must be async**.
+
+### 🎛️ **Dynamic Query Generation**
+Create queries on-the-fly based on request parameters
 
 ### 📊 **Smart Pagination**
 Built-in pagination with priority-based union pagination across databases
@@ -155,6 +158,49 @@ serve_select(
 GET /api/books?author=Stephen%20King&min_year=2000&limit=10&offset=0
 ```
 
+### Dynamic Queries
+
+**Create queries dynamically based on filters:**
+
+```python
+from typing import Callable
+from pydantic import BaseModel
+from dbanu import serve_select, SQLiteQueryEngine
+
+app = FastAPI()
+
+class DynamicFilter(BaseModel):
+    table: str
+    condition: str = "1=1"
+
+def create_query(query_template: str) -> Callable[[DynamicFilter], str]:
+    def query_builder(filters: DynamicFilter) -> str:
+        if filters.table == "":
+            raise ValueError("Table name cannot be empty")
+        return query_template.format(
+            _table=filters.table, 
+            _filters=filters.condition
+        )
+    return query_builder
+
+query_engine = SQLiteQueryEngine()
+
+serve_select(
+    app=app,
+    query_engine=query_engine,
+    path="/api/dynamic",
+    filter_model=DynamicFilter,
+    select_query=create_query("SELECT * FROM {_table} WHERE {_filters} LIMIT ? OFFSET ?"),
+    count_query=create_query("SELECT COUNT(*) FROM {_table} WHERE {_filters}")
+)
+```
+
+**Usage:**
+```bash
+# Query books table with author filter
+GET /api/dynamic?table=books&condition=author='Stephen%20King'&limit=10&offset=0
+```
+
 ### Multi-Database Union Queries
 
 **Query multiple databases simultaneously and get unified results!**
@@ -178,14 +224,17 @@ serve_union(
     sources={
         "classics": SelectSource(
             query_engine=sqlite_engine,
-            select_query="SELECT *, 'classic' as genre FROM books LIMIT ? OFFSET ?"
+            select_query="SELECT *, 'classic' as genre FROM books LIMIT ? OFFSET ?",
+            count_query="SELECT COUNT(*) FROM books"
         ),
         "fantasy": SelectSource(
             query_engine=pgsql_engine,
-            select_query="SELECT *, 'fantasy' as genre FROM books LIMIT %s OFFSET %s"
+            select_query="SELECT *, 'fantasy' as genre FROM books LIMIT %s OFFSET %s",
+            count_query="SELECT COUNT(*) FROM books"
         ),
     },
-    path="/api/all-books"
+    path="/api/all-books",
+    source_priority=["fantasy", "classics"]  # Default priority order
 )
 ```
 
@@ -212,14 +261,16 @@ async def get_current_user():
     return {"user_id": 1, "username": "demo_user", "role": "admin"}
 
 # Middleware: Logging
-def logging_middleware(context: QueryContext, next_handler):
+# IMPORTANT: Middleware functions MUST be async
+async def logging_middleware(context: QueryContext, next_handler):
     user_info = context.dependency_results.get("get_current_user", {})
     username = user_info.get("username", "anonymous")
     print(f"📝 Request from {username}: {context.filters.model_dump()}")
-    return next_handler()
+    return await next_handler(context)
 
 # Middleware: Authorization
-def authorization_middleware(context: QueryContext, next_handler):
+# IMPORTANT: Middleware functions MUST be async
+async def authorization_middleware(context: QueryContext, next_handler):
     current_user = context.dependency_results.get("get_current_user")
     if not current_user:
         raise HTTPException(status_code=401, detail="Authentication required")
@@ -228,7 +279,7 @@ def authorization_middleware(context: QueryContext, next_handler):
     if current_user.get("role") not in ["admin", "editor"]:
         raise HTTPException(status_code=403, detail="Insufficient permissions")
     
-    return next_handler()
+    return await next_handler(context)
 
 # Create the secure endpoint
 serve_select(
@@ -310,14 +361,14 @@ pytest tests/ -v
 
 - `app`: FastAPI application instance
 - `query_engine`: Database query engine (SQLite, PostgreSQL, or MySQL)
-- `select_query`: SQL SELECT query string
+- `select_query`: SQL SELECT query string or callable function that receives filters
 - `select_param`: Function to generate query parameters from filters
-- `count_query`: Optional SQL COUNT query for pagination
+- `count_query`: Optional SQL COUNT query for pagination (string or callable function)
 - `path`: API endpoint path (default: "/get")
 - `filter_model`: Pydantic model for filtering
 - `data_model`: Pydantic model for response data
 - `dependencies`: List of FastAPI dependencies
-- `middlewares`: List of middleware functions that receive `QueryContext`
+- `middlewares`: List of middleware functions that receive `QueryContext` (**MUST be async functions**)
 
 ### `serve_union` Parameters
 
@@ -327,7 +378,8 @@ pytest tests/ -v
 - `filter_model`: Pydantic model for filtering (applies to all sources)
 - `data_model`: Pydantic model for response data
 - `dependencies`: List of FastAPI dependencies
-- `middlewares`: List of middleware functions
+- `middlewares`: List of middleware functions (**MUST be async functions**)
+- `source_priority`: List of source names for default priority ordering
 
 ## 📄 License
 

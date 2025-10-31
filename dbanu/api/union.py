@@ -3,16 +3,18 @@ serve_union implementation with priority-based pagination
 """
 
 import inspect
-from typing import Any, Callable, Type
+from typing import Any, Callable, Type, TypeVar
 
 from fastapi import Depends, FastAPI, Request
 from pydantic import BaseModel, create_model
 
 from dbanu.api.dependencies import create_wrapped_fastapi_dependencies
 from dbanu.core.engine import QueryContext, SelectEngine
-from dbanu.core.middleware import create_middleware_chain, get_combined_middlewares
+from dbanu.core.middleware import create_middleware_chain, get_combined_middlewares, Middleware, validate_middlewares
 from dbanu.core.response import create_select_response_model
 from dbanu.utils.pagination import calculate_union_pagination
+
+Filter = TypeVar("Filter", bound=BaseModel)
 
 
 class SelectSource(BaseModel):
@@ -24,7 +26,12 @@ class SelectSource(BaseModel):
     select_param: Callable[[BaseModel, int, int], list[Any]] | None = None
     count_query: str | Callable[[BaseModel], str]
     count_param: Callable[[BaseModel], list[Any]] | None = None
-    middlewares: list[Any] | None = None
+    middlewares: list[Middleware] | None = None
+
+    def __init__(self, **data):
+        super().__init__(**data)
+        # Validate that all middlewares are async functions
+        validate_middlewares(self.middlewares)
 
 
 def serve_union(
@@ -34,7 +41,7 @@ def serve_union(
     filter_model: Type[BaseModel] | None = None,
     data_model: Type[BaseModel] | None = None,
     dependencies: list[Any] | None = None,
-    middlewares: list[Any] | None = None,
+    middlewares: list[Middleware] | None = None,
     summary: str | None = None,
     source_priority: list[str] | None = None,
     description: str | None = None,
@@ -47,6 +54,8 @@ def serve_union(
         filter_model = create_model("FilterModel")
     wrapped_dependencies = create_wrapped_fastapi_dependencies(dependencies)
     SelectResponseModel = create_select_response_model(data_model)
+    # Validate that all middlewares are async functions
+    validate_middlewares(middlewares)
 
     # Create the route with dependencies
     @app.get(

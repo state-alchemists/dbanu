@@ -7,6 +7,7 @@ from pydantic import BaseModel
 from dbanu import (
     MySQLQueryEngine,
     PostgreSQLQueryEngine,
+    QueryContext,
     SelectSource,
     SQLiteQueryEngine,
     serve_select,
@@ -195,7 +196,7 @@ async def rate_limit_check():
 
 
 ## Example middlewares with new Context-based signature
-async def logging_middleware(context, next_handler):
+async def logging_middleware(context: QueryContext, next_handler):
     """Middleware for logging requests"""
     user_info = context.dependency_results.get("get_current_user", {})
     username = user_info.get("username", "anonymous")
@@ -209,7 +210,7 @@ async def logging_middleware(context, next_handler):
     return result
 
 
-async def timing_middleware(context, next_handler):
+async def timing_middleware(context: QueryContext, next_handler):
     """Middleware for timing requests"""
     start_time = time.time()
     result = await next_handler(context)
@@ -218,11 +219,10 @@ async def timing_middleware(context, next_handler):
     return result
 
 
-async def authorization_middleware(context, next_handler):
+async def authorization_middleware(context: QueryContext, next_handler):
     """Middleware for authorization checks"""
     # Access the current user from dependency results
     current_user = context.dependency_results.get("get_current_user")
-    print(f"[CURRENT_USER] {current_user}")
     if not current_user:
         raise HTTPException(status_code=401, detail="Authentication required")
     # Example authorization check: only allow user_id 1 to access

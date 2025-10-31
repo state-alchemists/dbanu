@@ -12,6 +12,20 @@ from dbanu.core.engine import QueryContext
 Middleware = Callable[[QueryContext, Callable[[QueryContext], Any]], Any]
 
 
+def validate_middlewares(middlewares: list[Middleware] | None) -> None:
+    """Validate that all middleware functions are async"""
+    if middlewares is None:
+        return
+    
+    for i, middleware in enumerate(middlewares):
+        if not inspect.iscoroutinefunction(middleware):
+            raise TypeError(
+                f"Middleware at index {i} must be an async function. "
+                f"Got: {type(middleware).__name__}. "
+                f"Please define your middleware with 'async def'."
+            )
+
+
 def create_middleware_chain(
     middlewares: list[Middleware] | None, final_handler: Callable[[QueryContext], Any]
 ):
