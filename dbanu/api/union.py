@@ -20,9 +20,9 @@ class SelectSource(BaseModel):
 
     model_config = {"arbitrary_types_allowed": True}
     query_engine: SelectEngine
-    select_query: str
+    select_query: str | Callable[[BaseModel], str]
     select_param: Callable[[BaseModel, int, int], list[Any]] | None = None
-    count_query: str
+    count_query: str | Callable[[BaseModel], str]
     count_param: Callable[[BaseModel], list[Any]] | None = None
     middlewares: list[Any] | None = None
 
@@ -36,6 +36,7 @@ def serve_union(
     dependencies: list[Any] | None = None,
     middlewares: list[Any] | None = None,
     summary: str | None = None,
+    source_priority: list[str] | None = None,
     description: str | None = None,
 ):
     """
@@ -69,25 +70,25 @@ def serve_union(
         dependency_results = {}
         if request and hasattr(request.state, "dependency_results"):
             dependency_results = request.state.dependency_results
-
-        priority_list = (
-            list(sources.keys())
-            if priority is None
-            else [
-                source.strip() for source in priority.split(",") if source.strip() != ""
-            ]
-        )
-
+        priority_list = _get_priority_list(priority, source_priority, sources)
         # Step 1: Get total count from each source
         source_counts = {}
         total_count = 0
         for source_name in priority_list:
             source = sources[source_name]
+            count_query_str = (
+                source.count_query(filters)
+                if callable(source.count_query)
+                else source.count_query
+            )
+            count_param_list = (
+                source.count_param(filters) if source.count_param is not None else []
+            )
             count_context = QueryContext(
                 select_query="",
                 select_params=[],
-                count_query=source.count_query,
-                count_params=source.count_param,
+                count_query=count_query_str,
+                count_params=count_param_list,
                 filters=filters,
                 limit=0,
                 offset=0,
@@ -98,26 +99,29 @@ def serve_union(
             source_count = await handler(count_context)
             source_counts[source_name] = source_count
             total_count += source_count
-
         # Step 2: Calculate which records to fetch from each source
         fetch_plan = calculate_union_pagination(
             source_counts, priority_list, limit, offset
         )
-
         # Step 3: Fetch data according to the plan
         final_data = []
         for source_name, (source_limit, source_offset) in fetch_plan.items():
             source = sources[source_name]
             # Build select parameters for this specific source
-            select_args = (
+            select_query_str = (
+                source.select_query(filters)
+                if callable(source.select_query)
+                else source.select_query
+            )
+            select_param_list = (
                 source.select_param(filters, source_limit, source_offset)
                 if source.select_param is not None
                 else [source_limit, source_offset]
             )
             # Create QueryContext for this source
             select_context = QueryContext(
-                select_query=source.select_query,
-                select_params=select_args,
+                select_query=select_query_str,
+                select_params=select_param_list,
                 count_query="",
                 count_params=[],
                 filters=filters,
@@ -133,8 +137,23 @@ def serve_union(
             source_data = await handler(select_context)
             # Add the data to final result
             final_data.extend(source_data)
-
         return SelectResponseModel(data=final_data, count=total_count)
+
+
+def _get_priority_list(
+    source_priority_str: str | None,
+    default_source_priority: list[str] | None,
+    sources: dict[str, SelectSource],
+) -> list:
+    if source_priority_str is not None:
+        return [
+            source.strip()
+            for source in source_priority_str.split(",")
+            if source.strip() != ""
+        ]
+    if default_source_priority is not None:
+        return default_source_priority
+    return list(sources.keys())
 
 
 def _create_select_processor(query_engine: SelectEngine):

@@ -1,4 +1,5 @@
 import time
+from typing import Callable
 
 from fastapi import Depends, FastAPI, HTTPException
 from pydantic import BaseModel
@@ -161,27 +162,13 @@ class FreeQueryFilter(BaseModel):
     condition: str
 
 
-def modify_query(context: QueryContext, next_handler):
-    context.count_params = []
-    context.select_params = []
-    table_name = context.filters.table.strip()
-    if table_name == "":
-        raise ValueError("Table name cannot be empty")
-    condition = context.filters.condition.strip()
-    if condition == "":
-        condition = "1=1"
-    context.select_query = _construct_query(context.select_query, table_name, condition)
-    context.select_params = [context.limit, context.offset]
-    if context.count_query is not None:
-        context.count_query = _construct_query(
-            context.count_query, table_name, condition
-        )
-    print(context)
-    return next_handler()
+def query(query_template: str) -> Callable[[FreeQueryFilter], str]:
+    def create_query(filter: FreeQueryFilter) -> str:
+        if filter.table == "":
+            raise ValueError("Table name cannot be empty")
+        return query_template.format(_table=filter.table, _filters=filter.condition)
 
-
-def _construct_query(query: str, table_name: str, condition: str) -> str:
-    return query.replace("__table__", table_name).replace("__filters__", condition)
+    return create_query
 
 
 serve_select(
@@ -189,9 +176,8 @@ serve_select(
     query_engine=sqlite_query_engine,
     path="/api/v1/query",
     filter_model=FreeQueryFilter,
-    select_query="SELECT * FROM __table__ WHERE __filters__ LIMIT ? OFFSET ?",
-    count_query="SELECT count(1) FROM __table__ WHERE __filters__",
-    middlewares=[modify_query],
+    select_query=query("SELECT * FROM {_table} WHERE {_filters} LIMIT ? OFFSET ?"),
+    count_query=query("SELECT count(1) FROM {_table} WHERE {_filters}"),
 )
 
 

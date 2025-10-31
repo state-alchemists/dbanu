@@ -17,9 +17,9 @@ from dbanu.core.response import create_select_response_model
 def serve_select(
     app: FastAPI,
     query_engine: SelectEngine,
-    select_query: str,
+    select_query: str | Callable[[BaseModel], str],
     select_param: Callable[[BaseModel, int, int], list[Any]] | None = None,
-    count_query: str | None = None,
+    count_query: str | Callable[[BaseModel], str] | None = None,
     count_param: Callable[[BaseModel], list[Any]] | None = None,
     path: str = "/get",
     filter_model: Type[BaseModel] | None = None,
@@ -65,19 +65,23 @@ def serve_select(
         if request and hasattr(request.state, "dependency_results"):
             dependency_results = request.state.dependency_results
         # Build initial select parameters
-        select_args = (
+        select_query_str = (
+            select_query(filters) if callable(select_query) else select_query
+        )
+        select_param_list = (
             select_param(filters, limit, offset)
             if select_param is not None
             else [limit, offset]
         )
         # Build initial count parameters
-        count_args = count_param(filters) if count_param is not None else []
+        count_query_str = count_query(filters) if callable(count_query) else count_query
+        count_param_list = count_param(filters) if count_param is not None else []
         # Create initial QueryContext
         initial_context = QueryContext(
-            select_query=select_query,
-            select_params=select_args,
-            count_query=count_query,
-            count_params=count_args,
+            select_query=select_query_str,
+            select_params=select_param_list,
+            count_query=count_query_str,
+            count_params=count_param_list,
             filters=filters,
             limit=limit,
             offset=offset,
