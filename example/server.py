@@ -7,7 +7,6 @@ from pydantic import BaseModel
 from dbanu import (
     MySQLQueryEngine,
     PostgreSQLQueryEngine,
-    QueryContext,
     SelectSource,
     SQLiteQueryEngine,
     serve_select,
