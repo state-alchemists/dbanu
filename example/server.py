@@ -195,7 +195,7 @@ async def rate_limit_check():
 
 
 ## Example middlewares with new Context-based signature
-def logging_middleware(context, next_handler):
+async def logging_middleware(context, next_handler):
     """Middleware for logging requests"""
     user_info = context.dependency_results.get("get_current_user", {})
     username = user_info.get("username", "anonymous")
@@ -204,21 +204,21 @@ def logging_middleware(context, next_handler):
     )
     print(f"[LOG] Select query: {context.select_query}")
     print(f"[LOG] Select params: {context.select_params}")
-    result = next_handler()
+    result = await next_handler(context)
     print(f"[LOG] Response: {len(result.data)} items")
     return result
 
 
-def timing_middleware(context, next_handler):
+async def timing_middleware(context, next_handler):
     """Middleware for timing requests"""
     start_time = time.time()
-    result = next_handler()
+    result = await next_handler(context)
     end_time = time.time()
     print(f"[TIMING] Request took {end_time - start_time:.3f} seconds")
     return result
 
 
-def authorization_middleware(context, next_handler):
+async def authorization_middleware(context, next_handler):
     """Middleware for authorization checks"""
     # Access the current user from dependency results
     current_user = context.dependency_results.get("get_current_user")
@@ -233,7 +233,7 @@ def authorization_middleware(context, next_handler):
     if not rate_limit_passed:
         raise HTTPException(status_code=429, detail="Rate limit exceeded")
     # If all checks pass, proceed with the request
-    return next_handler()
+    return await next_handler(context)
 
 
 serve_select(

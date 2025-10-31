@@ -30,11 +30,15 @@ def _make_middleware_wrapper(
     """Wrap a middleware with the next handler"""
 
     async def wrapper(context: QueryContext):
-        # Check if the middleware is async
-        if inspect.iscoroutinefunction(current_middleware):
-            return await current_middleware(context, lambda ctx: next_handler(ctx))
-        else:
-            return current_middleware(context, lambda ctx: next_handler(ctx))
+        # Create an async-compatible next_handler
+        async def async_next_handler(ctx):
+            result = next_handler(ctx)
+            if inspect.iscoroutine(result):
+                return await result
+            return result
+        
+        # All middleware should be async now
+        return await current_middleware(context, async_next_handler)
 
     return wrapper
 
