@@ -23,9 +23,10 @@ class SelectSource(BaseModel):
     model_config = {"arbitrary_types_allowed": True}
     query_engine: SelectEngine
     select_query: str | Callable[[BaseModel], str]
-    select_param: Callable[[BaseModel, int, int], list[Any]] | None = None
+    select_param: Callable[[BaseModel, int, int], list[Any]] | list[str] | None = None
     count_query: str | Callable[[BaseModel], str]
-    count_param: Callable[[BaseModel], list[Any]] | None = None
+    count_param: Callable[[BaseModel], list[Any]] | list[str] | None = None
+    param: Callable[[BaseModel], list[Any]] | list[str] | None = None
     middlewares: list[Middleware] | None = None
 
     def __init__(self, **data):
