@@ -10,10 +10,16 @@ from pydantic import BaseModel, create_model
 
 from dbanu.api.dependencies import create_wrapped_fastapi_dependencies
 from dbanu.core.engine import QueryContext, SelectEngine
-from dbanu.core.middleware import create_middleware_chain, Middleware, validate_middlewares
+from dbanu.core.middleware import (
+    Middleware,
+    create_middleware_chain,
+    validate_middlewares,
+)
 from dbanu.core.response import create_select_response_model
+from dbanu.utils.param import get_parsed_count_params, get_parsed_select_params
 
 Filter = TypeVar("Filter", bound=BaseModel)
+
 
 def serve_select(
     app: FastAPI,
@@ -72,20 +78,18 @@ def serve_select(
         select_query_str = (
             select_query(filters) if callable(select_query) else select_query
         )
-        select_param_list = (
-            select_param(filters, limit, offset)
-            if select_param is not None
-            else [limit, offset]
+        parsed_select_params = get_parsed_select_params(
+            filters, limit, offset, select_param, param
         )
         # Build initial count parameters
         count_query_str = count_query(filters) if callable(count_query) else count_query
-        count_param_list = count_param(filters) if count_param is not None else []
+        parsed_count_params = get_parsed_count_params(filters, select_param, param)
         # Create initial QueryContext
         initial_context = QueryContext(
             select_query=select_query_str,
-            select_params=select_param_list,
+            select_params=parsed_select_params,
             count_query=count_query_str,
-            count_params=count_param_list,
+            count_params=parsed_count_params,
             filters=filters,
             limit=limit,
             offset=offset,

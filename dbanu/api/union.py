@@ -10,7 +10,12 @@ from pydantic import BaseModel, create_model
 
 from dbanu.api.dependencies import create_wrapped_fastapi_dependencies
 from dbanu.core.engine import QueryContext, SelectEngine
-from dbanu.core.middleware import create_middleware_chain, get_combined_middlewares, Middleware, validate_middlewares
+from dbanu.core.middleware import (
+    Middleware,
+    create_middleware_chain,
+    get_combined_middlewares,
+    validate_middlewares,
+)
 from dbanu.core.response import create_select_response_model
 from dbanu.utils.pagination import calculate_union_pagination
 

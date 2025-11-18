@@ -22,17 +22,17 @@ def create_wrapped_fastapi_dependencies(dependencies: list[Any] | None):
                     dependency_func = original_dep.dependency
                 else:
                     dependency_func = original_dep
-                
+
                 # Execute the dependency
                 if inspect.iscoroutinefunction(dependency_func):
                     result = await dependency_func()
                 else:
                     result = dependency_func()
-                
+
                 # Store the result in request state
                 if not hasattr(request.state, "dependency_results"):
                     request.state.dependency_results = {}
-                
+
                 # Use the dependency function name as key
                 dep_name = dependency_func.__name__
                 request.state.dependency_results[dep_name] = result
