@@ -19,6 +19,9 @@ class SQLiteQueryEngine(BaseQueryEngine):
 
     def _setup_database(self, conn: sqlite3.Connection):
         """Override this"""
+    
+    def _prepare_query(self, query: str) -> str:
+        return query.replace("?", "\\?").replace("%s", "?")
 
     def select(self, query: str, *params: Any) -> list[Any]:
         """

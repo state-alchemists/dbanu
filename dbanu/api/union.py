@@ -18,6 +18,7 @@ from dbanu.core.middleware import (
 )
 from dbanu.core.response import create_select_response_model
 from dbanu.utils.pagination import calculate_union_pagination
+from dbanu.utils.param import get_parsed_count_params, get_parsed_select_params
 
 Filter = TypeVar("Filter", bound=BaseModel)
 
@@ -96,14 +97,14 @@ def serve_union(
                 if callable(source.count_query)
                 else source.count_query
             )
-            count_param_list = (
-                source.count_param(filters) if source.count_param is not None else []
+            parsed_count_params = get_parsed_count_params(
+                filters, source.count_param, source.param
             )
             count_context = QueryContext(
                 select_query="",
                 select_params=[],
                 count_query=count_query_str,
-                count_params=count_param_list,
+                count_params=parsed_count_params,
                 filters=filters,
                 limit=0,
                 offset=0,
@@ -128,15 +129,13 @@ def serve_union(
                 if callable(source.select_query)
                 else source.select_query
             )
-            select_param_list = (
-                source.select_param(filters, source_limit, source_offset)
-                if source.select_param is not None
-                else [source_limit, source_offset]
+            parsed_select_params = get_parsed_select_params(
+                filters, source_limit, source_offset, source.select_param, source.param
             )
             # Create QueryContext for this source
             select_context = QueryContext(
                 select_query=select_query_str,
-                select_params=select_param_list,
+                select_params=parsed_select_params,
                 count_query="",
                 count_params=[],
                 filters=filters,

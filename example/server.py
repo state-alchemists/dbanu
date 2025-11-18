@@ -128,30 +128,13 @@ serve_select(
         "AND (year < ? OR ? IS NULL) "
         "LIMIT ? OFFSET ?"
     ),
-    select_param=lambda filters, limit, offset: [
-        filters.author,
-        filters.author,
-        filters.min_year,
-        filters.min_year,
-        filters.max_year,
-        filters.max_year,
-        limit,
-        offset,
-    ],
     count_query=(
         "SELECT COUNT(*) FROM books "
         "WHERE (author = ? OR ? IS NULL) "
         "AND (year > ? OR ? IS NULL) "
         "AND (year < ? OR ? IS NULL) "
     ),
-    count_param=lambda filters: [
-        filters.author,
-        filters.author,
-        filters.min_year,
-        filters.min_year,
-        filters.max_year,
-        filters.max_year,
-    ],
+    param=["author", "author", "min_year", "min_year", "max_year", "max_year"]
 )
 
 # 3. Custom Table and Filter
@@ -184,7 +167,7 @@ serve_select(
 # 4. Register the books endpoint with filters, dependencies and middlewares
 
 
-## Example FastAPI dependencies
+# Example FastAPI dependencies
 async def get_current_user():
     """Example dependency for authentication"""
     return {"user_id": 1, "username": "demo_user"}
@@ -195,7 +178,7 @@ async def rate_limit_check():
     return True
 
 
-## Example middlewares with new Context-based signature
+# Example middlewares with new Context-based signature
 async def logging_middleware(context: QueryContext, next_handler):
     """Middleware for logging requests"""
     user_info = context.dependency_results.get("get_current_user", {})
@@ -249,30 +232,13 @@ serve_select(
         "AND (year < ? OR ? IS NULL) "
         "LIMIT ? OFFSET ?"
     ),
-    select_param=lambda filters, limit, offset: [
-        filters.author,
-        filters.author,
-        filters.min_year,
-        filters.min_year,
-        filters.max_year,
-        filters.max_year,
-        limit,
-        offset,
-    ],
     count_query=(
         "SELECT COUNT(*) FROM books "
         "WHERE (author = ? OR ? IS NULL) "
         "AND (year > ? OR ? IS NULL) "
         "AND (year < ? OR ? IS NULL) "
     ),
-    count_param=lambda filters: [
-        filters.author,
-        filters.author,
-        filters.min_year,
-        filters.min_year,
-        filters.max_year,
-        filters.max_year,
-    ],
+    param=["author", "author", "min_year", "min_year", "max_year", "max_year"],
     dependencies=[Depends(get_current_user), Depends(rate_limit_check)],
     middlewares=[logging_middleware, authorization_middleware, timing_middleware],
 )
