@@ -10,21 +10,30 @@ from pydantic import BaseModel, create_model
 
 from dbanu.api.dependencies import create_wrapped_fastapi_dependencies
 from dbanu.core.engine import QueryContext, SelectEngine
-from dbanu.core.middleware import create_middleware_chain, Middleware, validate_middlewares
+from dbanu.core.middleware import (
+    Middleware,
+    create_middleware_chain,
+    validate_middlewares,
+)
 from dbanu.core.response import create_select_response_model
+from dbanu.utils.param import get_parsed_count_params, get_parsed_select_params
 
 Filter = TypeVar("Filter", bound=BaseModel)
+
 
 def serve_select(
     app: FastAPI,
     query_engine: SelectEngine,
     select_query: str | Callable[[Filter], str],
-    select_param: Callable[[Filter, int, int], list[Any]] | None = None,
+    select_param: Callable[[Filter, int, int], list[Any]] | list[str] | None = None,
     count_query: str | Callable[[Filter], str] | None = None,
-    count_param: Callable[[Filter], list[Any]] | None = None,
+    count_param: Callable[[Filter], list[Any]] | list[str] | None = None,
+    param: Callable[[Filter], list[Any]] | list[str] | None = None,
     path: str = "/get",
+    methods: list[str] | None = None,
     filter_model: Type[BaseModel] | None = None,
     data_model: Type[BaseModel] | None = None,
+    response_model: Type[BaseModel] | None = None,
     dependencies: list[Any] | None = None,
     middlewares: list[Middleware] | None = None,
     summary: str | None = None,
@@ -42,13 +51,14 @@ def serve_select(
     if filter_model is None:
         filter_model = create_model("FilterModel")
     wrapped_dependencies = create_wrapped_fastapi_dependencies(dependencies)
-    SelectResponseModel = create_select_response_model(data_model)
+    SelectResponseModel = response_model if response_model is not None else create_select_response_model(data_model)
     # Validate that all middlewares are async functions
     validate_middlewares(middlewares)
 
     # Create the route with dependencies
-    @app.get(
+    @app.api_route(
         path,
+        methods=methods,
         response_model=SelectResponseModel,
         dependencies=wrapped_dependencies,
         summary=summary,
@@ -71,20 +81,18 @@ def serve_select(
         select_query_str = (
             select_query(filters) if callable(select_query) else select_query
         )
-        select_param_list = (
-            select_param(filters, limit, offset)
-            if select_param is not None
-            else [limit, offset]
+        parsed_select_params = get_parsed_select_params(
+            filters, limit, offset, select_param, param
         )
         # Build initial count parameters
         count_query_str = count_query(filters) if callable(count_query) else count_query
-        count_param_list = count_param(filters) if count_param is not None else []
+        parsed_count_params = get_parsed_count_params(filters, count_param, param)
         # Create initial QueryContext
         initial_context = QueryContext(
             select_query=select_query_str,
-            select_params=select_param_list,
+            select_params=parsed_select_params,
             count_query=count_query_str,
-            count_params=count_param_list,
+            count_params=parsed_count_params,
             filters=filters,
             limit=limit,
             offset=offset,

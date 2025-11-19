@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   postgres:
     image: postgres:15
@@ -31,26 +29,6 @@ services:
       - ./init/mysql:/docker-entrypoint-initdb.d
     networks:
       - dbanu_network
-
-  # impala:
-  #   image: apache/impala:latest
-  #   container_name: dbanu_impala
-  #   environment:
-  #     - IMPALA_CATALOG_SERVICE_HOST=impala
-  #     - IMPALA_STATESTORE_HOST=impala
-  #   ports:
-  #     - "21000:21000"
-  #     - "21050:21050"
-  #     - "25000:25000"
-  #     - "25010:25010"
-  #     - "25020:25020"
-  #   volumes:
-  #     - ./init/impala:/opt/impala/init
-  #   networks:
-  #     - dbanu_network
-  #   depends_on:
-  #     - postgres
-  #     - mysql
 
 volumes:
   postgres_data:

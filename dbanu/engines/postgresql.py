@@ -2,14 +2,12 @@
 PostgreSQL query engine
 """
 
-from typing import Any
-
 import psycopg2
+from typing import Any
+from dbanu.core.engine import SelectEngine
 
-from dbanu.engines.base import BaseQueryEngine
 
-
-class PostgreSQLQueryEngine(BaseQueryEngine):
+class PostgreSQLQueryEngine(SelectEngine):
     """
     A PostgreSQL query engine that connects to a PostgreSQL database.
     """
@@ -45,17 +43,14 @@ class PostgreSQLQueryEngine(BaseQueryEngine):
         """
         conn = self._get_connection()
         cursor = conn.cursor()
-
         try:
             # Execute the query with parameters
             if params:
                 cursor.execute(query, params)
             else:
                 cursor.execute(query)
-
             # Fetch results
             results = cursor.fetchall()
-
             # Convert to list of dictionaries for Pydantic compatibility
             if results and len(results) > 0:
                 # Get column names
@@ -67,9 +62,8 @@ class PostgreSQLQueryEngine(BaseQueryEngine):
                 return dict_results
             else:
                 return []
-
         except Exception as e:
-            return self._handle_query_error(e, "SELECT")
+            raise e
         finally:
             cursor.close()
             conn.close()
@@ -80,20 +74,17 @@ class PostgreSQLQueryEngine(BaseQueryEngine):
         """
         conn = self._get_connection()
         cursor = conn.cursor()
-
         try:
             # Execute the query with parameters
             if params:
                 cursor.execute(query, params)
             else:
                 cursor.execute(query)
-
             # Fetch the count result
             result = cursor.fetchone()
             return result[0] if result else 0
-
         except Exception as e:
-            return self._handle_query_error(e, "COUNT")
+            raise e
         finally:
             cursor.close()
             conn.close()

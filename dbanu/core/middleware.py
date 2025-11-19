@@ -16,7 +16,7 @@ def validate_middlewares(middlewares: list[Middleware] | None) -> None:
     """Validate that all middleware functions are async"""
     if middlewares is None:
         return
-    
+
     for i, middleware in enumerate(middlewares):
         if not inspect.iscoroutinefunction(middleware):
             raise TypeError(
@@ -50,7 +50,7 @@ def _make_middleware_wrapper(
             if inspect.iscoroutine(result):
                 return await result
             return result
-        
+
         # All middleware should be async now
         return await current_middleware(context, async_next_handler)
 

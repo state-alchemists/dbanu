@@ -2,14 +2,12 @@
 MySQL query engine
 """
 
-from typing import Any
-
 import mysql.connector
+from typing import Any
+from dbanu.core.engine import SelectEngine
 
-from dbanu.engines.base import BaseQueryEngine
 
-
-class MySQLQueryEngine(BaseQueryEngine):
+class MySQLQueryEngine(SelectEngine):
     """
     A MySQL query engine that connects to a MySQL database.
     """
@@ -61,7 +59,7 @@ class MySQLQueryEngine(BaseQueryEngine):
             return list(results) if results else []
 
         except Exception as e:
-            return self._handle_query_error(e, "SELECT")
+            raise e
         finally:
             cursor.close()
             conn.close()
@@ -85,7 +83,7 @@ class MySQLQueryEngine(BaseQueryEngine):
             return result[0] if result else 0
 
         except Exception as e:
-            return self._handle_query_error(e, "COUNT")
+            raise e
         finally:
             cursor.close()
             conn.close()

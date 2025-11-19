@@ -4,11 +4,10 @@ SQLite query engine
 
 import sqlite3
 from typing import Any
+from dbanu.core.engine import SelectEngine
 
-from dbanu.engines.base import BaseQueryEngine
 
-
-class SQLiteQueryEngine(BaseQueryEngine):
+class SQLiteQueryEngine(SelectEngine):
     """
     A real SQLite query engine that connects to an actual database.
     """
@@ -19,6 +18,9 @@ class SQLiteQueryEngine(BaseQueryEngine):
 
     def _setup_database(self, conn: sqlite3.Connection):
         """Override this"""
+    
+    def _standardize_query(self, query: str) -> str:
+        return query.replace("%s", "?")
 
     def select(self, query: str, *params: Any) -> list[Any]:
         """
@@ -26,20 +28,17 @@ class SQLiteQueryEngine(BaseQueryEngine):
         """
         conn = sqlite3.connect(self._db_path)
         cursor = conn.cursor()
-
         # Setup database if needed
         self._setup_database(conn)
-
         try:
+            standardized_query = self._standardize_query(query)
             # Execute the query with parameters
             if params:
-                cursor.execute(query, params)
+                cursor.execute(standardized_query, params)
             else:
-                cursor.execute(query)
-
+                cursor.execute(standardized_query)
             # Fetch results
             results = cursor.fetchall()
-
             # Convert to list of dictionaries for Pydantic compatibility
             if results and len(results) > 0:
                 # Get column names
@@ -51,9 +50,8 @@ class SQLiteQueryEngine(BaseQueryEngine):
                 return dict_results
             else:
                 return []
-
         except Exception as e:
-            return self._handle_query_error(e, "SELECT")
+            raise e
         finally:
             conn.close()
 
@@ -63,22 +61,19 @@ class SQLiteQueryEngine(BaseQueryEngine):
         """
         conn = sqlite3.connect(self._db_path)
         cursor = conn.cursor()
-
         # Setup database if needed
         self._setup_database(conn)
-
         try:
+            standardized_query = self._standardize_query(query)
             # Execute the query with parameters
             if params:
-                cursor.execute(query, params)
+                cursor.execute(standardized_query, params)
             else:
-                cursor.execute(query)
-
+                cursor.execute(standardized_query)
             # Fetch the count result
             result = cursor.fetchone()
             return result[0] if result else 0
-
         except Exception as e:
-            return self._handle_query_error(e, "COUNT")
+            raise e
         finally:
             conn.close()
