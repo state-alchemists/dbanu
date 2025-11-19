@@ -14,12 +14,9 @@ def get_parsed_count_params(
     if callable(param):
         return param(filters)
     if isinstance(param, list):
-        parsed_param = []
-        for attr in param:
-            if not hasattr(filters, attr):
-                raise ValueError(f"{filters} doesn't have {attr}")
-            parsed_param.append(getattr(filters, attr))
-        return parsed_param
+        return [
+            _get_attr(filters, attr_name) for attr_name in param
+        ]
     return []
 
 
@@ -37,26 +34,30 @@ def get_parsed_select_params(
             return select_param(filters, limit, offset)
         if isinstance(select_param, list):
             parsed_param = []
-            for attr in select_param:
-                if attr == "limit":
+            for attr_name in select_param:
+                if attr_name == "limit":
                     parsed_param.append(limit)
                     continue
-                if attr == "offset":
+                if attr_name == "offset":
                     parsed_param.append(offset)
                     continue
-                if not hasattr(filters, attr):
-                    raise ValueError(f"{filters} doesn't have {attr}")
-                parsed_param.append(getattr(filters, attr))
+                parsed_param.append(_get_attr(filters, attr_name))
             return parsed_param
         return [limit, offset]
     if base_param is not None:
         if callable(base_param):
             return base_param(filters) + [limit, offset]
         if isinstance(base_param, list):
-            parsed_param = []
-            for attr in base_param:
-                if not hasattr(filters, attr):
-                    raise ValueError(f"{filters} doesn't have {attr}")
-                parsed_param.append(getattr(filters, attr))
-            return parsed_param + [limit, offset]
+            return [
+                _get_attr(filters, attr_name) for attr_name in base_param
+            ] + [limit, offset]
     return [limit, offset]
+
+
+def _get_attr(obj: Any, attr_names: str) -> Any:
+    attr = obj
+    for attr_name in attr_names.split("."):
+        if not hasattr(attr, attr_name):
+            raise ValueError(f"{obj} has no attribute {attr_name}")
+        attr = getattr(attr, attr_name)
+    return attr

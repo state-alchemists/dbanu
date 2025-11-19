@@ -37,7 +37,7 @@ serve_select(
     app=app,
     query_engine=sqlite_query_engine,
     path="/api/v1/sqlite/books",
-    select_query="SELECT * FROM books LIMIT ? OFFSET ?",
+    select_query="SELECT * FROM books LIMIT %s OFFSET %s",
     count_query="SELECT count(1) FROM books",
 )
 
@@ -76,7 +76,7 @@ serve_union(
     sources={
         "sqlite": SelectSource(
             query_engine=sqlite_query_engine,
-            select_query="SELECT *, 'sqlite' as source FROM books LIMIT ? OFFSET ?",
+            select_query="SELECT *, 'sqlite' as source FROM books LIMIT %s OFFSET %s",
             count_query="SELECT COUNT(1) FROM books",
         ),
         "psql": SelectSource(
@@ -97,10 +97,9 @@ serve_union(
 # 2. Register the books endpoint with filters
 
 
-## Define Pydantic models for our book data
+# Define Pydantic models for our book data
 class BookFilter(BaseModel):
     """Filter model for book queries"""
-
     author: str | None = None
     min_year: int | None = None
     max_year: int | None = None
@@ -123,16 +122,16 @@ serve_select(
     data_model=BookData,
     select_query=(
         "SELECT id, title, author, year FROM books "
-        "WHERE (author = ? OR ? IS NULL) "
-        "AND (year > ? OR ? IS NULL) "
-        "AND (year < ? OR ? IS NULL) "
-        "LIMIT ? OFFSET ?"
+        "WHERE (author = %s OR %s IS NULL) "
+        "AND (year > %s OR %s IS NULL) "
+        "AND (year < %s OR %s IS NULL) "
+        "LIMIT %s OFFSET %s"
     ),
     count_query=(
         "SELECT COUNT(*) FROM books "
-        "WHERE (author = ? OR ? IS NULL) "
-        "AND (year > ? OR ? IS NULL) "
-        "AND (year < ? OR ? IS NULL) "
+        "WHERE (author = %s OR %s IS NULL) "
+        "AND (year > %s OR %s IS NULL) "
+        "AND (year < %s OR %s IS NULL) "
     ),
     param=["author", "author", "min_year", "min_year", "max_year", "max_year"]
 )
@@ -159,7 +158,7 @@ serve_select(
     query_engine=sqlite_query_engine,
     path="/api/v1/query",
     filter_model=FreeQueryFilter,
-    select_query=query("SELECT * FROM {_table} WHERE {_filters} LIMIT ? OFFSET ?"),
+    select_query=query("SELECT * FROM {_table} WHERE {_filters} LIMIT %s OFFSET %s"),
     count_query=query("SELECT count(1) FROM {_table} WHERE {_filters}"),
 )
 
@@ -227,16 +226,16 @@ serve_select(
     data_model=BookData,
     select_query=(
         "SELECT id, title, author, year FROM books "
-        "WHERE (author = ? OR ? IS NULL) "
-        "AND (year > ? OR ? IS NULL) "
-        "AND (year < ? OR ? IS NULL) "
-        "LIMIT ? OFFSET ?"
+        "WHERE (author = %s OR %s IS NULL) "
+        "AND (year > %s OR %s IS NULL) "
+        "AND (year < %s OR %s IS NULL) "
+        "LIMIT %s OFFSET %s"
     ),
     count_query=(
         "SELECT COUNT(*) FROM books "
-        "WHERE (author = ? OR ? IS NULL) "
-        "AND (year > ? OR ? IS NULL) "
-        "AND (year < ? OR ? IS NULL) "
+        "WHERE (author = %s OR %s IS NULL) "
+        "AND (year > %s OR %s IS NULL) "
+        "AND (year < %s OR %s IS NULL) "
     ),
     param=["author", "author", "min_year", "min_year", "max_year", "max_year"],
     dependencies=[Depends(get_current_user), Depends(rate_limit_check)],

@@ -140,9 +140,9 @@ serve_select(
     filter_model=BookFilter,
     select_query=(
         "SELECT id, title, author, year FROM books "
-        "WHERE (author = ? OR ? IS NULL) "
-        "AND (year >= ? OR ? IS NULL) "
-        "LIMIT ? OFFSET ?"
+        "WHERE (author = %s OR %s IS NULL) "
+        "AND (year >= %s OR %s IS NULL) "
+        "LIMIT %s OFFSET %s"
     ),
     select_param=lambda filters, limit, offset: [
         filters.author, filters.author,
@@ -190,7 +190,7 @@ serve_select(
     query_engine=query_engine,
     path="/api/dynamic",
     filter_model=DynamicFilter,
-    select_query=create_query("SELECT * FROM {_table} WHERE {_filters} LIMIT ? OFFSET ?"),
+    select_query=create_query("SELECT * FROM {_table} WHERE {_filters} LIMIT %s OFFSET %s"),
     count_query=create_query("SELECT COUNT(*) FROM {_table} WHERE {_filters}")
 )
 ```
@@ -224,7 +224,7 @@ serve_union(
     sources={
         "classics": SelectSource(
             query_engine=sqlite_engine,
-            select_query="SELECT *, 'classic' as genre FROM books LIMIT ? OFFSET ?",
+            select_query="SELECT *, 'classic' as genre FROM books LIMIT %s OFFSET %s",
             count_query="SELECT COUNT(*) FROM books"
         ),
         "fantasy": SelectSource(
@@ -288,7 +288,7 @@ serve_select(
     path="/api/secure/books",
     dependencies=[Depends(get_current_user)],
     middlewares=[logging_middleware, authorization_middleware],
-    select_query="SELECT id, title, author FROM books LIMIT ? OFFSET ?"
+    select_query="SELECT id, title, author FROM books LIMIT %s OFFSET %s"
 )
 ```
 

@@ -33,6 +33,7 @@ def serve_select(
     methods: list[str] | None = None,
     filter_model: Type[BaseModel] | None = None,
     data_model: Type[BaseModel] | None = None,
+    response_model: Type[BaseModel] | None = None,
     dependencies: list[Any] | None = None,
     middlewares: list[Middleware] | None = None,
     summary: str | None = None,
@@ -50,7 +51,7 @@ def serve_select(
     if filter_model is None:
         filter_model = create_model("FilterModel")
     wrapped_dependencies = create_wrapped_fastapi_dependencies(dependencies)
-    SelectResponseModel = create_select_response_model(data_model)
+    SelectResponseModel = response_model if response_model is not None else create_select_response_model(data_model)
     # Validate that all middlewares are async functions
     validate_middlewares(middlewares)
 

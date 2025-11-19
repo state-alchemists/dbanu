@@ -38,19 +38,19 @@ class TestUnionLogic:
         sources = {
             "source-1": SelectSource(
                 query_engine=MockQueryEngine(["s1-r1", "s1-r2", "s1-r3"], 3),
-                select_query="SELECT * FROM table LIMIT ? OFFSET ?",
+                select_query="SELECT * FROM table LIMIT %s OFFSET %s",
                 count_query="SELECT COUNT(*) FROM table",
             ),
             "source-2": SelectSource(
                 query_engine=MockQueryEngine(["s2-r1", "s2-r2", "s2-r3", "s2-r4"], 4),
-                select_query="SELECT * FROM table LIMIT ? OFFSET ?",
+                select_query="SELECT * FROM table LIMIT %s OFFSET %s",
                 count_query="SELECT COUNT(*) FROM table",
             ),
             "source-3": SelectSource(
                 query_engine=MockQueryEngine(
                     ["s3-r1", "s3-r2", "s3-r3", "s3-r4", "s3-r5"], 5
                 ),
-                select_query="SELECT * FROM table LIMIT ? OFFSET ?",
+                select_query="SELECT * FROM table LIMIT %s OFFSET %s",
                 count_query="SELECT COUNT(*) FROM table",
             ),
         }
