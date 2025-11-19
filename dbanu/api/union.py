@@ -45,6 +45,7 @@ def serve_union(
     app: FastAPI,
     sources: dict[str, SelectSource],
     path: str = "/get",
+    methods: list[str] | None = None,
     filter_model: Type[BaseModel] | None = None,
     data_model: Type[BaseModel] | None = None,
     dependencies: list[Any] | None = None,
@@ -65,8 +66,9 @@ def serve_union(
     validate_middlewares(middlewares)
 
     # Create the route with dependencies
-    @app.get(
+    @app.api_route(
         path,
+        methods=methods,
         response_model=SelectResponseModel,
         dependencies=wrapped_dependencies,
         summary=summary,

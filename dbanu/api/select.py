@@ -30,6 +30,7 @@ def serve_select(
     count_param: Callable[[Filter], list[Any]] | list[str] | None = None,
     param: Callable[[Filter], list[Any]] | list[str] | None = None,
     path: str = "/get",
+    methods: list[str] | None = None,
     filter_model: Type[BaseModel] | None = None,
     data_model: Type[BaseModel] | None = None,
     dependencies: list[Any] | None = None,
@@ -54,8 +55,9 @@ def serve_select(
     validate_middlewares(middlewares)
 
     # Create the route with dependencies
-    @app.get(
+    @app.api_route(
         path,
+        methods=methods,
         response_model=SelectResponseModel,
         dependencies=wrapped_dependencies,
         summary=summary,
@@ -83,7 +85,7 @@ def serve_select(
         )
         # Build initial count parameters
         count_query_str = count_query(filters) if callable(count_query) else count_query
-        parsed_count_params = get_parsed_count_params(filters, select_param, param)
+        parsed_count_params = get_parsed_count_params(filters, count_param, param)
         # Create initial QueryContext
         initial_context = QueryContext(
             select_query=select_query_str,
