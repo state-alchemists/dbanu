@@ -17,6 +17,7 @@ from dbanu.core.middleware import (
 )
 from dbanu.core.response import create_select_response_model
 from dbanu.utils.param import get_parsed_count_params, get_parsed_select_params
+from dbanu.utils.string import to_var_name
 
 Filter = TypeVar("Filter", bound=BaseModel)
 
@@ -36,6 +37,7 @@ def serve_select(
     response_model: Type[BaseModel] | None = None,
     dependencies: list[Any] | None = None,
     middlewares: list[Middleware] | None = None,
+    name: str | None = None,
     summary: str | None = None,
     description: str | None = None,
 ):
@@ -48,10 +50,16 @@ def serve_select(
     - supports FastAPI dependencies
     - supports middleware system
     """
+    var_name = to_var_name(name, path)
     if filter_model is None:
         filter_model = create_model("FilterModel")
+        if var_name is not None:
+            filter_model.__name__ = f"{var_name}Filter"
+    if response_model is None:
+        response_model = create_select_response_model(data_model)
+        if var_name is not None:
+            response_model.__name__ = f"{var_name}Data"
     wrapped_dependencies = create_wrapped_fastapi_dependencies(dependencies)
-    SelectResponseModel = response_model if response_model is not None else create_select_response_model(data_model)
     # Validate that all middlewares are async functions
     validate_middlewares(middlewares)
 
@@ -59,8 +67,9 @@ def serve_select(
     @app.api_route(
         path,
         methods=methods,
-        response_model=SelectResponseModel,
+        response_model=response_model,
         dependencies=wrapped_dependencies,
+        name=name,
         summary=summary,
         description=description,
     )
@@ -98,7 +107,7 @@ def serve_select(
             offset=offset,
             dependency_results=dependency_results,
         )
-        query_processor = _create_query_processor(query_engine, SelectResponseModel)
+        query_processor = _create_query_processor(query_engine, response_model)
         handler = create_middleware_chain(middlewares, query_processor)
         return await handler(initial_context)
 

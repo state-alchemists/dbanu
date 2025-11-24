@@ -1,6 +1,6 @@
 [project]
 name = "dbanu"
-version = "0.0.10"
+version = "0.0.11"
 description = "FastAPI SQL Query Engine"
 authors = [
     {name = "gofrendi",email = "gofrendiasgard@gmail.com"}
@@ -13,7 +13,6 @@ dependencies = [
     "psycopg2-binary (>=2.9.11,<3.0.0)",
     "mysql-connector-python (>=9.4.0,<10.0.0)"
 ]
-
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]
