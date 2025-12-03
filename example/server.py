@@ -237,6 +237,7 @@ serve_select(
         "AND (year > %s OR %s IS NULL) "
         "AND (year < %s OR %s IS NULL) "
     ),
+    methods=["post"],
     param=["author", "author", "min_year", "min_year", "max_year", "max_year"],
     dependencies=[Depends(get_current_user), Depends(rate_limit_check)],
     middlewares=[logging_middleware, authorization_middleware, timing_middleware],
