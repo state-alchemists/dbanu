@@ -352,7 +352,7 @@ python -m example.server
 pip install pytest pytest-asyncio
 
 # Run all tests
-pytest tests/ -v
+python -m pytest tests/ -v
 ```
 
 ## 📖 API Reference
