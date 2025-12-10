@@ -2,8 +2,10 @@
 MySQL query engine
 """
 
-import mysql.connector
 from typing import Any
+
+import mysql.connector
+
 from dbanu.core.engine import SelectEngine
 
 

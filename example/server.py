@@ -103,6 +103,7 @@ serve_union(
 # Define Pydantic models for our book data
 class BookFilter(BaseModel):
     """Filter model for book queries"""
+
     author: str | None = None
     min_year: int | None = None
     max_year: int | None = None
@@ -136,7 +137,7 @@ serve_select(
         "AND (year > %s OR %s IS NULL) "
         "AND (year < %s OR %s IS NULL) "
     ),
-    param=["author", "author", "min_year", "min_year", "max_year", "max_year"]
+    param=["author", "author", "min_year", "min_year", "max_year", "max_year"],
 )
 
 # 3. Custom Table and Filter

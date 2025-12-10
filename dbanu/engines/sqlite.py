@@ -4,6 +4,7 @@ SQLite query engine
 
 import sqlite3
 from typing import Any
+
 from dbanu.core.engine import SelectEngine
 
 
@@ -18,7 +19,7 @@ class SQLiteQueryEngine(SelectEngine):
 
     def _setup_database(self, conn: sqlite3.Connection):
         """Override this"""
-    
+
     def _standardize_query(self, query: str) -> str:
         return query.replace("%s", "?")
 

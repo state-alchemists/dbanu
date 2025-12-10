@@ -14,9 +14,7 @@ def get_parsed_count_params(
     if callable(param):
         return param(filters)
     if isinstance(param, list):
-        return [
-            _get_attr(filters, attr_name) for attr_name in param
-        ]
+        return [_get_attr(filters, attr_name) for attr_name in param]
     return []
 
 
@@ -48,9 +46,10 @@ def get_parsed_select_params(
         if callable(base_param):
             return base_param(filters) + [limit, offset]
         if isinstance(base_param, list):
-            return [
-                _get_attr(filters, attr_name) for attr_name in base_param
-            ] + [limit, offset]
+            return [_get_attr(filters, attr_name) for attr_name in base_param] + [
+                limit,
+                offset,
+            ]
     return [limit, offset]
 
 

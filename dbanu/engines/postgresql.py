@@ -2,8 +2,10 @@
 PostgreSQL query engine
 """
 
-import psycopg2
 from typing import Any
+
+import psycopg2
+
 from dbanu.core.engine import SelectEngine
 
 

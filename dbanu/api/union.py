@@ -2,7 +2,7 @@ import inspect
 import traceback
 from typing import Any, Callable, Type, TypeVar
 
-from fastapi import Body, Depends, FastAPI, Request, HTTPException
+from fastapi import Body, Depends, FastAPI, HTTPException, Request
 from pydantic import BaseModel, create_model
 
 from dbanu.api.dependencies import create_wrapped_fastapi_dependencies
@@ -66,12 +66,12 @@ def serve_union(
             "FilterModel" if var_name is None else f"{var_name.capitalize()}Filter",
             limit=(int, default_limit if default_limit is not None else 100),
             offset=(int, 0),
-            priority=(str | None, None)
+            priority=(str | None, None),
         )
     if response_model is None:
         response_model = create_select_response_model(
             "ResponseModel" if var_name is None else f"{var_name.capitalize()}Response",
-            data_model
+            data_model,
         )
     wrapped_dependencies = create_wrapped_fastapi_dependencies(dependencies)
     # Validate that all middlewares are async functions
@@ -98,7 +98,7 @@ def serve_union(
         for source_name in priority_list:
             source = sources[source_name]
             count_query_str = (
-               source.count_query(filter_data)
+                source.count_query(filter_data)
                 if callable(source.count_query)
                 else source.count_query
             )
@@ -135,7 +135,11 @@ def serve_union(
                 else source.select_query
             )
             parsed_select_params = get_parsed_select_params(
-                filter_data, source_limit, source_offset, source.select_param, source.param
+                filter_data,
+                source_limit,
+                source_offset,
+                source.select_param,
+                source.param,
             )
             # Create QueryContext for this source
             select_context = QueryContext(
@@ -158,9 +162,9 @@ def serve_union(
             final_data.extend(source_data)
         return response_model(data=final_data, count=total_count)
 
-
     # Register routes based on methods
     if "GET" in methods:
+
         @app.get(
             path,
             response_model=response_model,
@@ -179,7 +183,7 @@ def serve_union(
             except Exception as e:
                 traceback.print_exc()
                 raise HTTPException(500, f"{e}")
-    
+
     # Register other methods (POST, PUT, etc.)
     other_methods = [m for m in methods if m != "GET"]
     if other_methods:
@@ -214,7 +218,8 @@ def _get_priority_list(
         return [
             source.strip()
             for source in source_priority_str.split(",")
-            if source.strip() != "" if source in sources
+            if source.strip() != ""
+            if source in sources
         ]
     if default_source_priority is not None:
         return default_source_priority

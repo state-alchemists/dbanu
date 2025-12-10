@@ -2,7 +2,7 @@ import inspect
 import traceback
 from typing import Any, Callable, Type, TypeVar
 
-from fastapi import Body, Depends, FastAPI, Request, HTTPException
+from fastapi import Body, Depends, FastAPI, HTTPException, Request
 from pydantic import BaseModel, create_model
 
 from dbanu.api.dependencies import create_wrapped_fastapi_dependencies
@@ -54,12 +54,12 @@ def serve_select(
         filter_model = create_model(
             "FilterModel" if var_name is None else f"{var_name.capitalize()}Filter",
             limit=(int, default_limit if default_limit is not None else 100),
-            offset=(int, 0)
+            offset=(int, 0),
         )
     if response_model is None:
         response_model = create_select_response_model(
             "ResponseModel" if var_name is None else f"{var_name.capitalize()}Response",
-            data_model
+            data_model,
         )
     wrapped_dependencies = create_wrapped_fastapi_dependencies(dependencies)
     # Validate that all middlewares are async functions
@@ -86,7 +86,9 @@ def serve_select(
             filter_data, limit, offset, select_param, param
         )
         # Build initial count parameters
-        count_query_str = count_query(filter_data) if callable(count_query) else count_query
+        count_query_str = (
+            count_query(filter_data) if callable(count_query) else count_query
+        )
         parsed_count_params = get_parsed_count_params(filter_data, count_param, param)
         # Create initial QueryContext
         initial_context = QueryContext(
@@ -105,6 +107,7 @@ def serve_select(
 
     # Register routes based on methods
     if "GET" in methods:
+
         @app.get(
             path,
             response_model=response_model,
@@ -123,7 +126,7 @@ def serve_select(
             except Exception as e:
                 traceback.print_exc()
                 raise HTTPException(500, f"{e}")
-    
+
     # Register other methods (POST, PUT, etc.)
     other_methods = [m for m in methods if m != "GET"]
     if other_methods:
