@@ -3,7 +3,7 @@ import traceback
 from typing import Any, Callable, Type, TypeVar
 
 from fastapi import Body, Depends, FastAPI, HTTPException, Request
-from pydantic import BaseModel, create_model
+from pydantic import BaseModel, Field, create_model
 
 from dbanu.api.dependencies import create_wrapped_fastapi_dependencies
 from dbanu.core.engine import QueryContext, SelectEngine
@@ -13,6 +13,7 @@ from dbanu.core.middleware import (
     validate_middlewares,
 )
 from dbanu.core.response import create_select_response_model
+from dbanu.utils.filter import enhance_select_filter
 from dbanu.utils.param import get_parsed_count_params, get_parsed_select_params
 from dbanu.utils.string import to_var_name
 
@@ -53,9 +54,8 @@ def serve_select(
     if filter_model is None:
         filter_model = create_model(
             "FilterModel" if var_name is None else f"{var_name.capitalize()}Filter",
-            limit=(int, default_limit if default_limit is not None else 100),
-            offset=(int, 0),
         )
+    filter_model = enhance_select_filter(filter_model, default_limit)
     if response_model is None:
         response_model = create_select_response_model(
             "ResponseModel" if var_name is None else f"{var_name.capitalize()}Response",
