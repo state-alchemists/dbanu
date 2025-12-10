@@ -52,6 +52,7 @@ serve_select(
     app=app,
     query_engine=pgsql_query_engine,
     path="/api/v1/pgsql/books",
+    methods=["GET", "POST"],
     select_query="SELECT * FROM books LIMIT %s OFFSET %s",
     count_query="SELECT count(1) FROM books",
 )
@@ -67,6 +68,7 @@ serve_select(
     app=app,
     query_engine=mysql_query_engine,
     path="/api/v1/mysql/books",
+    methods=["GET", "POST"],
     select_query="SELECT * FROM books LIMIT %s OFFSET %s",
     count_query="SELECT count(1) FROM books",
 )
@@ -91,6 +93,7 @@ serve_union(
         ),
     },
     path="/api/v1/all/books",
+    methods=["GET", "POST"],
     description="Get all books from sqlite, postgre, and mysql",
 )
 
