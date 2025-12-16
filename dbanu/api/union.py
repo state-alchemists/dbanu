@@ -85,12 +85,12 @@ def serve_union(
         # Get params from filters
         limit = getattr(filter_data, "limit", 100)
         offset = getattr(filter_data, "offset", 0)
-        priority = getattr(filter_data, "priority", None)
+        selected_source_priority = getattr(filter_data, "sources", None)
         # Extract dependency results from request state
         dependency_results = {}
         if request and hasattr(request.state, "dependency_results"):
             dependency_results = request.state.dependency_results
-        priority_list = _get_priority_list(priority, source_priority, sources)
+        priority_list = _get_priority_list(selected_source_priority, source_priority, sources)
         # Step 1: Get total count from each source
         source_counts = {}
         total_count = 0

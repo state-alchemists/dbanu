@@ -244,7 +244,7 @@ serve_union(
 GET /api/all-books?limit=20&offset=0
 
 # Control source priority
-GET /api/all-books?limit=20&offset=0&priority=fantasy,classics
+GET /api/all-books?limit=20&offset=0&sources=fantasy,classics
 ```
 
 ### Enterprise-Grade with Middleware

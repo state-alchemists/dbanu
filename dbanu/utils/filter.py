@@ -24,10 +24,10 @@ def enhance_select_filter(base_cls: type[BaseModel], default_limit: int | None):
 
 def enhance_union_filter(base_cls: type[BaseModel], default_limit: int | None):
     new_base_cls = enhance_select_filter(base_cls, default_limit)
-    if not hasattr(base_cls, "priority"):
+    if not hasattr(base_cls, "sources"):
         return create_model(
             new_base_cls.__name__,
             __base__=new_base_cls,
-            priority=(str | None, None),
+            sources=(str | None, None),
         )
     return new_base_cls
