@@ -1,5 +1,5 @@
 """
-Dependency injection utilities for DBAnu
+Middleware dependency injection utilities for DBAnu
 """
 
 import inspect
@@ -8,12 +8,12 @@ from typing import Any
 from fastapi import Depends, Request
 
 
-def create_wrapped_fastapi_dependencies(dependencies: list[Any] | None):
-    """Create wrapped dependencies that store results in request state"""
-    if dependencies is None:
+def create_wrapped_middleware_dependencies(middleware_dependencies: list[Any] | None):
+    """Create wrapped middleware dependencies that store results in request state"""
+    if middleware_dependencies is None:
         return []
     wrapped_dependencies = []
-    for dep in dependencies:
+    for dep in middleware_dependencies:
         # Create a closure-safe wrapper for each dependency
         def create_wrapped_dependency(original_dep):
             async def wrapped_dependency(request: Request):

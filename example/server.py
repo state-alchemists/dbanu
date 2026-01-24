@@ -184,7 +184,7 @@ async def rate_limit_check():
 # Example middlewares with new Context-based signature
 async def logging_middleware(context: QueryContext, next_handler):
     """Middleware for logging requests"""
-    user_info = context.dependency_results.get("get_current_user", {})
+    user_info = context.middleware_dependency_results.get("get_current_user", {})
     username = user_info.get("username", "anonymous")
     print(
         f"[LOG] Request from {username}: filters={context.filters.model_dump()}, limit={context.limit}, offset={context.offset}"
@@ -208,14 +208,14 @@ async def timing_middleware(context: QueryContext, next_handler):
 async def authorization_middleware(context: QueryContext, next_handler):
     """Middleware for authorization checks"""
     # Access the current user from dependency results
-    current_user = context.dependency_results.get("get_current_user")
+    current_user = context.middleware_dependency_results.get("get_current_user")
     if not current_user:
         raise HTTPException(status_code=401, detail="Authentication required")
     # Example authorization check: only allow user_id 1 to access
     if current_user.get("user_id") != 1:
         raise HTTPException(status_code=403, detail="Access forbidden")
     # Check rate limiting
-    rate_limit_passed = context.dependency_results.get("rate_limit_check", False)
+    rate_limit_passed = context.middleware_dependency_results.get("rate_limit_check", False)
     if not rate_limit_passed:
         raise HTTPException(status_code=429, detail="Rate limit exceeded")
     # If all checks pass, proceed with the request
@@ -243,7 +243,7 @@ serve_select(
     ),
     methods=["get", "post"],
     param=["author", "author", "min_year", "min_year", "max_year", "max_year"],
-    dependencies=[Depends(get_current_user), Depends(rate_limit_check)],
+    middleware_dependencies=[Depends(get_current_user), Depends(rate_limit_check)],
     middlewares=[logging_middleware, authorization_middleware, timing_middleware],
 )
 

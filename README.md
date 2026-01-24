@@ -256,14 +256,14 @@ from dbanu import serve_select, SQLiteQueryEngine, QueryContext
 app = FastAPI()
 query_engine = SQLiteQueryEngine()
 
-# Authentication dependency
+# Middleware dependency for authentication
 async def get_current_user():
     return {"user_id": 1, "username": "demo_user", "role": "admin"}
 
 # Middleware: Logging
 # IMPORTANT: Middleware functions MUST be async
 async def logging_middleware(context: QueryContext, next_handler):
-    user_info = context.dependency_results.get("get_current_user", {})
+    user_info = context.middleware_dependency_results.get("get_current_user", {})
     username = user_info.get("username", "anonymous")
     print(f"📝 Request from {username}: {context.filters.model_dump()}")
     return await next_handler(context)
@@ -271,7 +271,7 @@ async def logging_middleware(context: QueryContext, next_handler):
 # Middleware: Authorization
 # IMPORTANT: Middleware functions MUST be async
 async def authorization_middleware(context: QueryContext, next_handler):
-    current_user = context.dependency_results.get("get_current_user")
+    current_user = context.middleware_dependency_results.get("get_current_user")
     if not current_user:
         raise HTTPException(status_code=401, detail="Authentication required")
     
@@ -286,7 +286,7 @@ serve_select(
     app=app,
     query_engine=query_engine,
     path="/api/secure/books",
-    dependencies=[Depends(get_current_user)],
+    middleware_dependencies=[Depends(get_current_user)],
     middlewares=[logging_middleware, authorization_middleware],
     select_query="SELECT id, title, author FROM books LIMIT %s OFFSET %s"
 )
