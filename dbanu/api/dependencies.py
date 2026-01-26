@@ -16,19 +16,17 @@ def create_wrapped_middleware_dependencies(middleware_dependencies: list[Any] | 
     for dep in middleware_dependencies:
         # Create a closure-safe wrapper for each dependency
         def create_wrapped_dependency(original_dep):
-            async def wrapped_dependency(request: Request):
-                # Extract the actual dependency function from Depends object
-                if hasattr(original_dep, "dependency"):
-                    dependency_func = original_dep.dependency
-                else:
-                    dependency_func = original_dep
+            # Extract the actual dependency function for naming
+            if hasattr(original_dep, "dependency"):
+                dependency_func = original_dep.dependency
+                # original_dep is likely a Depends/Security object, use it directly
+                dependency_provider = original_dep
+            else:
+                dependency_func = original_dep
+                # Wrap raw callable in Depends
+                dependency_provider = Depends(original_dep)
 
-                # Execute the dependency
-                if inspect.iscoroutinefunction(dependency_func):
-                    result = await dependency_func()
-                else:
-                    result = dependency_func()
-
+            async def wrapped_dependency(request: Request, result: Any = dependency_provider):
                 # Store the result in request state
                 if not hasattr(request.state, "dependency_results"):
                     request.state.dependency_results = {}
