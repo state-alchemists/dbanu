@@ -5,7 +5,7 @@ from typing import Any, Callable, Type, TypeVar
 from fastapi import Body, Depends, FastAPI, HTTPException, Request, Query
 from pydantic import BaseModel, Field, create_model
 
-from dbanu.api.dependencies import create_wrapped_middleware_dependencies
+from dbanu.api.dependencies import create_wrapped_dependencies
 from dbanu.core.engine import QueryContext, SelectEngine
 from dbanu.core.middleware import (
     Middleware,
@@ -48,7 +48,7 @@ def serve_union(
     filter_model: Type[BaseModel] | None = None,
     data_model: Type[BaseModel] | None = None,
     response_model: Type[BaseModel] | None = None,
-    middleware_dependencies: list[Any] | None = None,
+    dependencies: list[Any] | None = None,
     middlewares: list[Middleware] | None = None,
     source_priority: list[str] | None = None,
     name: str | None = None,
@@ -61,8 +61,8 @@ def serve_union(
     with priority-based pagination
     
     Parameters:
-    - middleware_dependencies: Dependencies whose results are stored in request state 
-      for middleware access (available via context.middleware_dependency_results)
+    - dependencies: Dependencies whose results are stored in request state 
+      for middleware access (available via context.dependency_results)
     """
     methods = ["GET"] if methods is None else [m.upper() for m in methods]
     var_name = to_var_name(name, path)
@@ -76,7 +76,7 @@ def serve_union(
             "ResponseModel" if var_name is None else f"{var_name.capitalize()}Response",
             data_model,
         )
-    all_dependencies = create_wrapped_middleware_dependencies(middleware_dependencies)
+    all_dependencies = create_wrapped_dependencies(dependencies)
     # Validate that all middlewares are async functions
     validate_middlewares(middlewares)
 
@@ -90,10 +90,10 @@ def serve_union(
         limit = getattr(filter_data, "limit", 100)
         offset = getattr(filter_data, "offset", 0)
         selected_source_priority = getattr(filter_data, "sources", None)
-        # Extract middleware dependency results from request state
-        middleware_dependency_results = {}
+        # Extract dependency results from request state
+        dependency_results = {}
         if request and hasattr(request.state, "dependency_results"):
-            middleware_dependency_results = request.state.dependency_results
+            dependency_results = request.state.dependency_results
         priority_list = _get_priority_list(selected_source_priority, source_priority, sources)
         # Step 1: Get total count from each source
         source_counts = {}
@@ -116,7 +116,7 @@ def serve_union(
                 filters=filter_data,
                 limit=0,
                 offset=0,
-                middleware_dependency_results=middleware_dependency_results,
+                dependency_results=dependency_results,
             )
             count_processor = _create_count_processor(source.query_engine)
             handler = create_middleware_chain(source.middlewares, count_processor)
@@ -153,7 +153,7 @@ def serve_union(
                 filters=filter_data,
                 limit=source_limit,
                 offset=source_offset,
-                middleware_dependency_results=middleware_dependency_results,
+                dependency_results=dependency_results,
             )
             select_processor = _create_select_processor(source.query_engine)
             handler = create_middleware_chain(

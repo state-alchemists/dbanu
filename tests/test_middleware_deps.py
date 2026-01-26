@@ -16,7 +16,7 @@ async def get_token(x_token: str = Header(None)):
     return x_token
 
 async def auth_middleware(context: QueryContext, next_handler):
-    token = context.middleware_dependency_results.get("get_token")
+    token = context.dependency_results.get("get_token")
     if not token:
         raise HTTPException(status_code=401, detail="Token not found in middleware results")
     return await next_handler(context)
@@ -30,7 +30,7 @@ def test_middleware_dependency_with_header():
         query_engine=engine,
         path="/test",
         select_query="SELECT * FROM books",
-        middleware_dependencies=[Depends(get_token)],
+        dependencies=[Depends(get_token)],
         middlewares=[auth_middleware]
     )
     
@@ -50,7 +50,7 @@ def test_middleware_dependency_invalid_token():
         query_engine=engine,
         path="/test",
         select_query="SELECT * FROM books",
-        middleware_dependencies=[Depends(get_token)],
+        dependencies=[Depends(get_token)],
         middlewares=[auth_middleware]
     )
     

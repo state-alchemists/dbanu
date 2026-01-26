@@ -35,4 +35,4 @@ class QueryContext(BaseModel):
     filters: BaseModel
     limit: int
     offset: int
-    middleware_dependency_results: dict[str, Any]
+    dependency_results: dict[str, Any]

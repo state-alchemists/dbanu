@@ -5,7 +5,7 @@ from typing import Any, Callable, Type, TypeVar
 from fastapi import Body, Depends, FastAPI, HTTPException, Request, Query
 from pydantic import BaseModel, Field, create_model
 
-from dbanu.api.dependencies import create_wrapped_middleware_dependencies
+from dbanu.api.dependencies import create_wrapped_dependencies
 from dbanu.core.engine import QueryContext, SelectEngine
 from dbanu.core.middleware import (
     Middleware,
@@ -33,7 +33,7 @@ def serve_select(
     filter_model: Type[BaseModel] | None = None,
     data_model: Type[BaseModel] | None = None,
     response_model: Type[BaseModel] | None = None,
-    middleware_dependencies: list[Any] | None = None,
+    dependencies: list[Any] | None = None,
     middlewares: list[Middleware] | None = None,
     name: str | None = None,
     summary: str | None = None,
@@ -46,9 +46,9 @@ def serve_select(
     - return pydantic model with two property:
         - data (data_model)
         - count (int)
-    - supports middleware dependencies (via middleware_dependencies parameter):
+    - supports dependencies (via dependencies parameter):
         * Dependencies whose results are stored in request state for middleware access
-        * Results available via context.middleware_dependency_results in middleware
+        * Results available via context.dependency_results in middleware
     - supports middleware system
     """
     methods = ["GET"] if methods is None else [m.upper() for m in methods]
@@ -63,7 +63,7 @@ def serve_select(
             "ResponseModel" if var_name is None else f"{var_name.capitalize()}Response",
             data_model,
         )
-    all_dependencies = create_wrapped_middleware_dependencies(middleware_dependencies)
+    all_dependencies = create_wrapped_dependencies(dependencies)
     # Validate that all middlewares are async functions
     validate_middlewares(middlewares)
 
@@ -76,10 +76,10 @@ def serve_select(
         # Get params from filters
         limit = getattr(filter_data, "limit", 100)
         offset = getattr(filter_data, "offset", 0)
-        # Extract middleware dependency results from request state
-        middleware_dependency_results = {}
+        # Extract dependency results from request state
+        dependency_results = {}
         if request and hasattr(request.state, "dependency_results"):
-            middleware_dependency_results = request.state.dependency_results
+            dependency_results = request.state.dependency_results
         # Build initial select parameters
         select_query_str = (
             select_query(filter_data) if callable(select_query) else select_query
@@ -101,7 +101,7 @@ def serve_select(
             filters=filter_data,
             limit=limit,
             offset=offset,
-            middleware_dependency_results=middleware_dependency_results,
+            dependency_results=dependency_results,
         )
         query_processor = _create_query_processor(query_engine, response_model)
         handler = create_middleware_chain(middlewares, query_processor)

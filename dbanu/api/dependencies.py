@@ -8,12 +8,12 @@ from typing import Any
 from fastapi import Depends, Request
 
 
-def create_wrapped_middleware_dependencies(middleware_dependencies: list[Any] | None):
-    """Create wrapped middleware dependencies that store results in request state"""
-    if middleware_dependencies is None:
+def create_wrapped_dependencies(dependencies: list[Any] | None):
+    """Create wrapped dependencies that store results in request state"""
+    if dependencies is None:
         return []
     wrapped_dependencies = []
-    for dep in middleware_dependencies:
+    for dep in dependencies:
         # Create a closure-safe wrapper for each dependency
         def create_wrapped_dependency(original_dep):
             # Extract the actual dependency function for naming
