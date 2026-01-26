@@ -76,11 +76,7 @@ def serve_union(
             "ResponseModel" if var_name is None else f"{var_name.capitalize()}Response",
             data_model,
         )
-    wrapped_middleware_dependencies = create_wrapped_middleware_dependencies(middleware_dependencies)
-    # Combine middleware dependencies with fastapi dependencies
-    all_dependencies = []
-    if wrapped_middleware_dependencies:
-        all_dependencies.extend(wrapped_middleware_dependencies)
+    all_dependencies = create_wrapped_middleware_dependencies(middleware_dependencies)
     # Validate that all middlewares are async functions
     validate_middlewares(middlewares)
 
