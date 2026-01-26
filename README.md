@@ -256,7 +256,7 @@ from dbanu import serve_select, SQLiteQueryEngine, QueryContext
 app = FastAPI()
 query_engine = SQLiteQueryEngine()
 
-# Authentication dependency
+# Middleware dependency for authentication
 async def get_current_user():
     return {"user_id": 1, "username": "demo_user", "role": "admin"}
 

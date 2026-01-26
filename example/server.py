@@ -1,7 +1,7 @@
 import time
 from typing import Callable
 
-from fastapi import Depends, FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException, Header
 from pydantic import BaseModel
 
 from dbanu import (
@@ -170,7 +170,7 @@ serve_select(
 # 4. Register the books endpoint with filters, dependencies and middlewares
 
 
-# Example FastAPI dependencies
+# Example of middleware dependencies
 async def get_current_user():
     """Example dependency for authentication"""
     return {"user_id": 1, "username": "demo_user"}
@@ -178,6 +178,13 @@ async def get_current_user():
 
 async def rate_limit_check():
     """Example dependency for rate limiting"""
+    return True
+
+
+async def check_admin_secret(x_hasura_admin_secret: str | None = Header(None)):
+    """Check for admin secret header"""
+    if x_hasura_admin_secret != "my-secret":
+        raise HTTPException(status_code=401, detail="Invalid admin secret")
     return True
 
 
@@ -218,6 +225,12 @@ async def authorization_middleware(context: QueryContext, next_handler):
     rate_limit_passed = context.dependency_results.get("rate_limit_check", False)
     if not rate_limit_passed:
         raise HTTPException(status_code=429, detail="Rate limit exceeded")
+    
+    # Check admin secret
+    secret_passed = context.dependency_results.get("check_admin_secret", False)
+    if not secret_passed:
+         raise HTTPException(status_code=401, detail="Unauthorized")
+
     # If all checks pass, proceed with the request
     return await next_handler(context)
 
@@ -243,7 +256,7 @@ serve_select(
     ),
     methods=["get", "post"],
     param=["author", "author", "min_year", "min_year", "max_year", "max_year"],
-    dependencies=[Depends(get_current_user), Depends(rate_limit_check)],
+    dependencies=[Depends(get_current_user), Depends(rate_limit_check), Depends(check_admin_secret)],
     middlewares=[logging_middleware, authorization_middleware, timing_middleware],
 )
 
