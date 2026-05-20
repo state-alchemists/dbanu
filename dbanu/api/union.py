@@ -1,8 +1,10 @@
+import asyncio
 import inspect
 import traceback
 from typing import Any, Callable, Type, TypeVar
 
 from fastapi import Body, Depends, FastAPI, HTTPException, Request, Query
+from fastapi.concurrency import run_in_threadpool
 from pydantic import BaseModel, Field, create_model
 
 from dbanu.api.dependencies import create_wrapped_dependencies
@@ -95,10 +97,8 @@ def serve_union(
         if request and hasattr(request.state, "dependency_results"):
             dependency_results = request.state.dependency_results
         priority_list = _get_priority_list(selected_source_priority, source_priority, sources)
-        # Step 1: Get total count from each source
-        source_counts = {}
-        total_count = 0
-        for source_name in priority_list:
+        # Step 1: Fan out per-source count queries concurrently.
+        async def _count_for_source(source_name: str) -> int:
             source = sources[source_name]
             count_query_str = (
                 source.count_query(filter_data)
@@ -120,18 +120,24 @@ def serve_union(
             )
             count_processor = _create_count_processor(source.query_engine)
             handler = create_middleware_chain(source.middlewares, count_processor)
-            source_count = await handler(count_context)
-            source_counts[source_name] = source_count
-            total_count += source_count
-        # Step 2: Calculate which records to fetch from each source
+            return await handler(count_context)
+
+        count_results = await asyncio.gather(
+            *(_count_for_source(name) for name in priority_list)
+        )
+        source_counts = dict(zip(priority_list, count_results))
+        total_count = sum(count_results)
+        # Step 2: Calculate which records to fetch from each source.
         fetch_plan = calculate_union_pagination(
             source_counts, priority_list, limit, offset
         )
-        # Step 3: Fetch data according to the plan
-        final_data = []
-        for source_name, (source_limit, source_offset) in fetch_plan.items():
+
+        # Step 3: Fan out the selects concurrently, preserving priority order
+        # so the response remains deterministic.
+        async def _select_for_source(
+            source_name: str, source_limit: int, source_offset: int
+        ) -> list[Any]:
             source = sources[source_name]
-            # Build select parameters for this specific source
             select_query_str = (
                 source.select_query(filter_data)
                 if callable(source.select_query)
@@ -144,7 +150,6 @@ def serve_union(
                 source.select_param,
                 source.param,
             )
-            # Create QueryContext for this source
             select_context = QueryContext(
                 select_query=select_query_str,
                 select_params=parsed_select_params,
@@ -160,9 +165,18 @@ def serve_union(
                 get_combined_middlewares(middlewares, source.middlewares),
                 select_processor,
             )
-            source_data = await handler(select_context)
-            # Add the data to final result
-            final_data.extend(source_data)
+            return await handler(select_context)
+
+        plan_items = list(fetch_plan.items())
+        select_results = await asyncio.gather(
+            *(
+                _select_for_source(name, lim, off)
+                for name, (lim, off) in plan_items
+            )
+        )
+        final_data: list[Any] = []
+        for rows in select_results:
+            final_data.extend(rows)
         return response_model(data=final_data, count=total_count)
 
     # Register routes based on methods
@@ -240,11 +254,12 @@ def _create_select_processor(query_engine: SelectEngine):
 
     async def process_select(context: QueryContext) -> list[Any]:
         select_params = context.select_params or []
-        # Check if select method is a coroutine
         select_method = query_engine.select
         if inspect.iscoroutinefunction(select_method):
             return await select_method(context.select_query, *select_params)
-        return select_method(context.select_query, *select_params)
+        return await run_in_threadpool(
+            select_method, context.select_query, *select_params
+        )
 
     return process_select
 
@@ -259,6 +274,8 @@ def _create_count_processor(query_engine: SelectEngine):
         select_count_method = query_engine.select_count
         if inspect.iscoroutinefunction(select_count_method):
             return await select_count_method(context.count_query, *count_params)
-        return select_count_method(context.count_query, *count_params)
+        return await run_in_threadpool(
+            select_count_method, context.count_query, *count_params
+        )
 
     return process_count
