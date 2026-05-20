@@ -3,6 +3,7 @@ import traceback
 from typing import Any, Callable, Type, TypeVar
 
 from fastapi import Body, Depends, FastAPI, HTTPException, Request, Query
+from fastapi.concurrency import run_in_threadpool
 from pydantic import BaseModel, Field, create_model
 
 from dbanu.api.dependencies import create_wrapped_dependencies
@@ -167,20 +168,24 @@ def _create_query_processor(
 
     async def process_query(context: QueryContext):
         select_params = context.select_params or []
-        # Check if select method is a coroutine
+        # Sync engines must run off the event loop so concurrent requests
+        # are not serialized behind a single blocking DB call.
         select_method = query_engine.select
         if inspect.iscoroutinefunction(select_method):
             data = await select_method(context.select_query, *select_params)
         else:
-            data = select_method(context.select_query, *select_params)
+            data = await run_in_threadpool(
+                select_method, context.select_query, *select_params
+            )
         if context.count_query:
             count_params = context.count_params or []
-            # Check if select_count method is a coroutine
             select_count_method = query_engine.select_count
             if inspect.iscoroutinefunction(select_count_method):
                 total = await select_count_method(context.count_query, *count_params)
             else:
-                total = select_count_method(context.count_query, *count_params)
+                total = await run_in_threadpool(
+                    select_count_method, context.count_query, *count_params
+                )
             return response_model(data=data, count=total)
         return response_model(data=data, count=len(data))
 

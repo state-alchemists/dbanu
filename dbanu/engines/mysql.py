@@ -2,9 +2,11 @@
 MySQL query engine
 """
 
+import threading
 from typing import Any
 
 import mysql.connector
+from mysql.connector import pooling as mysql_pooling
 
 from dbanu.core.engine import SelectEngine
 
@@ -12,6 +14,9 @@ from dbanu.core.engine import SelectEngine
 class MySQLQueryEngine(SelectEngine):
     """
     A MySQL query engine that connects to a MySQL database.
+
+    Uses mysql-connector's built-in connection pool so individual requests
+    do not pay the cost of opening a fresh handshake on every call.
     """
 
     def __init__(
@@ -21,6 +26,8 @@ class MySQLQueryEngine(SelectEngine):
         database: str = "mysql",
         user: str = "root",
         password: str = "",
+        pool_size: int = 10,
+        pool_name: str = "dbanu_mysql",
     ):
         self._host = host
         self._port = port
@@ -34,10 +41,28 @@ class MySQLQueryEngine(SelectEngine):
             "user": user,
             "password": password,
         }
+        # MySQL connector caps pool_size at 32; clamp here so an over-eager
+        # caller does not crash at pool creation time.
+        self._pool_size = max(1, min(pool_size, 32))
+        self._pool_name = pool_name
+        self._pool: mysql_pooling.MySQLConnectionPool | None = None
+        self._pool_lock = threading.Lock()
+
+    def _get_pool(self) -> mysql_pooling.MySQLConnectionPool:
+        if self._pool is None:
+            with self._pool_lock:
+                if self._pool is None:
+                    self._pool = mysql_pooling.MySQLConnectionPool(
+                        pool_name=self._pool_name,
+                        pool_size=self._pool_size,
+                        pool_reset_session=True,
+                        **self._connection_params,
+                    )
+        return self._pool
 
     def _get_connection(self):
-        """Get a connection to the MySQL database."""
-        return mysql.connector.connect(**self._connection_params)
+        """Borrow a pooled connection."""
+        return self._get_pool().get_connection()
 
     def select(self, query: str, *params: Any) -> list[Any]:
         """
@@ -45,25 +70,16 @@ class MySQLQueryEngine(SelectEngine):
         """
         conn = self._get_connection()
         cursor = conn.cursor(dictionary=True)
-
         try:
-            # Execute the query with parameters
             if params:
                 cursor.execute(query, params)
             else:
                 cursor.execute(query)
-
-            # Fetch results (MySQL connector with dictionary=True returns dicts)
             results = cursor.fetchall()
-
-            # Convert to list of dictionaries for Pydantic compatibility
-            # MySQL connector with dictionary=True already returns dicts
             return list(results) if results else []
-
-        except Exception as e:
-            raise e
         finally:
             cursor.close()
+            # Returning a pooled connection just releases it back to the pool.
             conn.close()
 
     def select_count(self, query: str, *params: Any) -> int:
@@ -72,20 +88,13 @@ class MySQLQueryEngine(SelectEngine):
         """
         conn = self._get_connection()
         cursor = conn.cursor()
-
         try:
-            # Execute the query with parameters
             if params:
                 cursor.execute(query, params)
             else:
                 cursor.execute(query)
-
-            # Fetch the count result
             result = cursor.fetchone()
             return result[0] if result else 0
-
-        except Exception as e:
-            raise e
         finally:
             cursor.close()
             conn.close()
